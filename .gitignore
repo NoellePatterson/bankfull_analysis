@@ -1,0 +1,7 @@
+data/
+GIS/
+my-virtualenv/
+.vscode/
+field_site_info.txt
+CS_DATA_ALL.txt
+C3_XS_analysis.py
