@@ -19,24 +19,26 @@ from matplotlib import pyplot as plt
 import pdb
 
 # Run parameters 
-# transect_fp = 'GIS/data_inputs/Leggett/XS_Sections/Thalweg_10m_adjusted.shp'
-# bankfull_fp = 'GIS/data_inputs/Leggett/Bankfull_raster/SFE_Leggett_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
-# dem_fp = 'GIS/data_inputs/Leggett/1m_Topobathy/dem.tif'
-# reach_name = 'Leggett' # specify reach of the Eel River
+transect_fp = 'GIS/data_inputs/Leggett/XS_Sections/Thalweg_10m_adjusted.shp'
+bankfull_fp = 'GIS/data_inputs/Leggett/Bankfull_raster/SFE_Leggett_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
+dem_fp = 'GIS/data_inputs/Leggett/1m_Topobathy/dem.tif'
+reach_name = 'Leggett' # specify reach of the Eel River
 
 # transect_fp = 'GIS/data_inputs/Miranda/XS_Sections/Thalweg_10m_adjusted.shp'
 # bankfull_fp = 'GIS/data_inputs/Miranda/Bankfull_raster/SFE_Miranda_001_d_Max.tif' # preprocessing required to convert native .flt to .tif
 # dem_fp = 'GIS/data_inputs/Miranda/1m_Topobathy/dem.tif'
 # reach_name = 'Miranda' # specify reach of the Eel River
 
-transect_fp = 'GIS/data_inputs/Scotia/XS_Sections/Thalweg_15m_adjusted.shp'
-bankfull_fp = 'GIS/data_inputs/Scotia/Bankfull_raster/SFE_Scotia_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
-dem_fp = 'GIS/data_inputs/Scotia/1m_Topobathy/dem.tif'
-reach_name = 'Scotia' # specify reach of the Eel River
+# transect_fp = 'GIS/data_inputs/Scotia/XS_Sections/Thalweg_15m_adjusted.shp'
+# bankfull_fp = 'GIS/data_inputs/Scotia/Bankfull_raster/SFE_Scotia_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
+# dem_fp = 'GIS/data_inputs/Scotia/1m_Topobathy/dem.tif'
+# reach_name = 'Scotia' # specify reach of the Eel River
 
-# Create output folder if needed
+# Create output folders if needed
 if not os.path.exists('data/data_outputs/{}'.format(reach_name)):
     os.makedirs('data/data_outputs/{}'.format(reach_name))
+if not os.path.exists('data/data_outputs/{}/derivative_plots'.format(reach_name)):
+    os.makedirs('data/data_outputs/{}/derivative_plots'.format(reach_name))
 
 # Upload test data: transects, stations, and bankfull raster 
 transects = gpd.read_file(transect_fp)
@@ -56,6 +58,7 @@ def plot_bankfull():
     # For each transect, find intersection points with bankfull, and plot transects with intersections
     bankfull = []
     for index, row in transects.iterrows():
+        fig_list = []
         line = gpd.GeoDataFrame({'geometry': [row['geometry']]}, crs=transects.crs)
         intersect_pts = line.geometry.intersection(bankfull_boundary)
 
@@ -106,11 +109,14 @@ def plot_bankfull():
         plt.ylabel('Elevation (Meters)')
         plt.title('Eel River at {}'.format(reach_name))
         plt.legend()
-        plt.savefig('data/data_outputs/{}/bankfull_transect_{}.jpeg'.format(reach_name, index))
+        # Can I save each plot as an object, add it to a list, and return that list from this function?
+        fig_list.append(fig)
+        # plt.savefig('data/data_outputs/{}/bankfull_transect_{}.jpeg'.format(reach_name, index))
         plt.close()
-    print('average bankfull is {}m'.format(np.nanmean(bankfull)))
+    print('Median bankfull is {}m'.format(np.nanmedian(bankfull)))
+    return(fig_list)
 
-def calc_dwdh():
+def calc_dwdh(fig_list):
     # Loop through xsections and create dw/dh array for each xsection
     # df to store arrays of w and h
     all_widths_df = pd.DataFrame(columns=['widths'])
@@ -183,7 +189,50 @@ def calc_dwdh():
         wh_ls = pd.DataFrame({'widths':[wh_ls], 'transect_id':transects_index})
         all_widths_df = pd.concat([all_widths_df, wh_ls], ignore_index=True)
 
-    print('Out of {} total measurements, {} were not accounted for based on uneven bank crossings'. format(total_measurements, incomplete_intersection_counter))
+    # calculate and plot second derivative of width (height is constant)
+    ddw_ls = []
+    for x_index, xsection in enumerate(all_widths_df['widths']): # loop through all x-sections
+        dw = []
+        ddw = []
+        for w_index, current_width in enumerate(xsection): # loop through all widths in current xsection
+            if w_index < len(xsection) - 1: # can caluclate differences up to second to last index
+                current_d = (xsection[w_index + 1] - current_width)/d_interval
+                dw.append(current_d)
+        for dw_index, current_dw in enumerate(dw): # loop through all first order rate changes to get second order change  (slope break)
+            if dw_index < len(dw) - 1: # can calculate differences up to second to last first-order change
+                current_dd = (dw[dw_index + 1] - current_dw)/d_interval
+                ddw.append(current_dd)
+        # Find max second derivative as bankfull
+        ddw_abs = [abs(i) for i in ddw]
+        max_ddw = np.nanmax(ddw_abs)
+        max_ddw_index = ddw_abs.index(max_ddw)
+        bankfull_id_elevation = d_interval * max_ddw_index # sea-level elevation corresponding with bankfull
+        # Plot x-section/first/second derivative plot and identified bankfull
+        def get_x_vals(y_vals):
+            x_len = round(len(y_vals) * d_interval, 4)
+            x_vals = np.arange(0, x_len, d_interval)
+            return(x_vals)
+        x_section_xvals = get_x_vals(xsection)
+        dw_xvals = get_x_vals(dw)
+        ddw_xvals = get_x_vals(ddw)
+        fig, ax = plt.subplots(3,1, figsize=(18, 9))
+        plt.xlabel('Distance from 0-elevation (m)')
+        ax[0].plot(x_section_xvals, xsection)
+        ax[0].set_title('Cross-section')
+        ax[1].plot(dw_xvals, dw)
+        ax[1].set_title('First order rate of change')
+        ax[2].plot(ddw_xvals, ddw)
+        ax[2].set_title('Second order rate of change')
+        ax[2].axvline(bankfull_id_elevation, color='black', label='Bankfull ID = {}m'.format(bankfull_id_elevation))
+        ax[2].axvline(227.473, color='black', linestyle='dashed', label='2D model bankfull avg = 227.473m')
+        plt.legend(loc='lower left')
+        plt.savefig('data/data_outputs/{}/derivative_plots/{}'.format(reach_name, x_index))
+        plt.close()
+        ddw_ls.append(bankfull_id_elevation)
+
+    breakpoint()
+
+    print('Out of {} total measurements, {} were not accounted for based on uneven bank crossings'.format(total_measurements, incomplete_intersection_counter))
     
     plot_xss = [2,42,88,91,181,217]
     # Plot all widths spaghetti style
@@ -204,7 +253,7 @@ def calc_dwdh():
                 xs_name = index
                 plt.plot(x_vals, row[0], linewidth=2.5, label='x-section {}'.format(index), zorder=len(all_widths_df), color='red')
                 plt.legend()
-        plt.savefig('data/data_outputs/{}/all_widths_xs-{}.jpeg'.format(reach_name, str(xs_name)), dpi=400)
+        # plt.savefig('data/data_outputs/{}/all_widths_xs-{}.jpeg'.format(reach_name, str(xs_name)), dpi=400)
         plt.close()
 
     # Plot average and bounds on all widths
@@ -212,7 +261,8 @@ def calc_dwdh():
     fig, ax = plt.subplots()
     plt.xlabel('Distance from channel bottom (m)')
     plt.ylabel('Channel width (m)')
-    plt.title('Average incremental channel top widths for {}'.format(reach_name))
+    plt.title('Median incremental channel top widths for {}'.format(reach_name))
+    plt.axvline(227.647, label='median bankfull')
     max_len = max(all_widths_df['widths'].apply(len)) # find the longest row in df
     all_widths_df['widths_padded'] = all_widths_df['widths'].apply(lambda x: np.pad(x, (0, max_len - len(x)), constant_values=np.nan)) # pad all shorter rows with nan
     padded_df = pd.DataFrame(all_widths_df['widths_padded'].tolist())
@@ -221,13 +271,12 @@ def calc_dwdh():
     transect_75 = padded_df.apply(lambda row: np.nanpercentile(row, 75), axis=0)
     x_len = round(len(transect_50) * d_interval, 4)
     x_vals = np.arange(0, x_len, d_interval)
-    # plt.xlim([210, 300])
+    plt.xlim([210, 300])
     plt.plot(x_vals, transect_50, color='black')
     plt.plot(x_vals, transect_25, color='blue')
     plt.plot(x_vals, transect_75, color='blue')
-    plt.savefig('data/data_outputs/{}/average_widths.jpeg'.format(reach_name), dpi=400)
+    plt.savefig('data/data_outputs/{}/median_widths.jpeg'.format(reach_name), dpi=400)
     # after calcing array of w/d for each xs, calc the deltas
-    # plot deltas, loop through df and add each to a plot w transparent lines
 
-output = calc_dwdh()
-# output = plot_bankfull()
+fig_list = plot_bankfull()
+output = calc_dwdh(fig_list)
