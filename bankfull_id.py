@@ -23,16 +23,19 @@ transect_fp = 'GIS/data_inputs/Leggett/XS_Sections/Thalweg_10m_adjusted.shp'
 bankfull_fp = 'GIS/data_inputs/Leggett/Bankfull_raster/SFE_Leggett_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
 dem_fp = 'GIS/data_inputs/Leggett/1m_Topobathy/dem.tif'
 reach_name = 'Leggett' # specify reach of the Eel River
+median_bankfull = 227.647 # model-derived reach-averaged bankfull
 
 # transect_fp = 'GIS/data_inputs/Miranda/XS_Sections/Thalweg_10m_adjusted.shp'
 # bankfull_fp = 'GIS/data_inputs/Miranda/Bankfull_raster/SFE_Miranda_001_d_Max.tif' # preprocessing required to convert native .flt to .tif
 # dem_fp = 'GIS/data_inputs/Miranda/1m_Topobathy/dem.tif'
 # reach_name = 'Miranda' # specify reach of the Eel River
+# median_bankfull = 72.284 # model-derived reach-averaged bankfull
 
 # transect_fp = 'GIS/data_inputs/Scotia/XS_Sections/Thalweg_15m_adjusted.shp'
 # bankfull_fp = 'GIS/data_inputs/Scotia/Bankfull_raster/SFE_Scotia_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
 # dem_fp = 'GIS/data_inputs/Scotia/1m_Topobathy/dem.tif'
 # reach_name = 'Scotia' # specify reach of the Eel River
+# median_bankfull = 22.244 # model-derived reach-averaged bankfull
 
 # Create output folders if needed
 if not os.path.exists('data/data_outputs/{}'.format(reach_name)):
@@ -116,7 +119,7 @@ def plot_bankfull():
     print('Median bankfull is {}m'.format(np.nanmedian(bankfull)))
     return(fig_list)
 
-def calc_dwdh(fig_list):
+def calc_dwdh():
     # Loop through xsections and create dw/dh array for each xsection
     # df to store arrays of w and h
     all_widths_df = pd.DataFrame(columns=['widths'])
@@ -190,7 +193,7 @@ def calc_dwdh(fig_list):
         all_widths_df = pd.concat([all_widths_df, wh_ls], ignore_index=True)
 
     # calculate and plot second derivative of width (height is constant)
-    ddw_ls = []
+    bankfull_results = []
     for x_index, xsection in enumerate(all_widths_df['widths']): # loop through all x-sections
         dw = []
         ddw = []
@@ -226,10 +229,26 @@ def calc_dwdh(fig_list):
         ax[2].axvline(bankfull_id_elevation, color='black', label='Bankfull ID = {}m'.format(bankfull_id_elevation))
         ax[2].axvline(227.473, color='black', linestyle='dashed', label='2D model bankfull avg = 227.473m')
         plt.legend(loc='lower left')
-        plt.savefig('data/data_outputs/{}/derivative_plots/{}'.format(reach_name, x_index))
+        # plt.savefig('data/data_outputs/{}/derivative_plots/{}'.format(reach_name, x_index))
         plt.close()
-        ddw_ls.append(bankfull_id_elevation)
+        bankfull_results.append(bankfull_id_elevation)
 
+    # Plot bankfull results along logitudinal profile
+    if reach_name == 'Leggett' or reach_name == 'Miranda':
+        transect_spacing = 10 # units meters
+    elif reach_name == 'Scotia':
+        transect_spacing = 15 # units meters
+    x_len = len(bankfull_results)
+    x_vals = np.arange(0, (x_len * transect_spacing), transect_spacing)
+    fig, ax = plt.subplots()
+    plt.xlabel('Transects from upstream to downstream (m)')
+    plt.ylabel('Bankfull elevation ASL (m)')
+    plt.title('Logitudinal profile of bankfull elevations, {}'.format(reach_name))
+    plt.plot(x_vals, bankfull_results)
+    plt.axhline(median_bankfull, linestyle='dashed', color='black', label='modeled median bankfull')
+    plt.legend(loc='upper right')
+    plt.savefig('data/data_outputs/{}/Bankfull_longitudinals'.format(reach_name))
+    plt.close()
     breakpoint()
 
     print('Out of {} total measurements, {} were not accounted for based on uneven bank crossings'.format(total_measurements, incomplete_intersection_counter))
@@ -275,8 +294,8 @@ def calc_dwdh(fig_list):
     plt.plot(x_vals, transect_50, color='black')
     plt.plot(x_vals, transect_25, color='blue')
     plt.plot(x_vals, transect_75, color='blue')
-    plt.savefig('data/data_outputs/{}/median_widths.jpeg'.format(reach_name), dpi=400)
+    # plt.savefig('data/data_outputs/{}/median_widths.jpeg'.format(reach_name), dpi=400)
     # after calcing array of w/d for each xs, calc the deltas
 
-fig_list = plot_bankfull()
-output = calc_dwdh(fig_list)
+# fig_list = plot_bankfull()
+output = calc_dwdh()
