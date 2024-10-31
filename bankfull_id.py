@@ -19,11 +19,11 @@ from matplotlib import pyplot as plt
 import pdb
 
 # Run parameters 
-transect_fp = 'GIS/data_inputs/Leggett/XS_Sections/Thalweg_10m_adjusted.shp'
-bankfull_fp = 'GIS/data_inputs/Leggett/Bankfull_raster/SFE_Leggett_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
-dem_fp = 'GIS/data_inputs/Leggett/1m_Topobathy/dem.tif'
-reach_name = 'Leggett' # specify reach of the Eel River
-median_bankfull = 227.647 # model-derived reach-averaged bankfull
+# transect_fp = 'GIS/data_inputs/Leggett/XS_Sections/Thalweg_10m_adjusted.shp'
+# bankfull_fp = 'GIS/data_inputs/Leggett/Bankfull_raster/SFE_Leggett_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
+# dem_fp = 'GIS/data_inputs/Leggett/1m_Topobathy/dem.tif'
+# reach_name = 'Leggett' # specify reach of the Eel River
+# median_bankfull = 227.647 # model-derived reach-averaged bankfull
 
 # transect_fp = 'GIS/data_inputs/Miranda/XS_Sections/Thalweg_10m_adjusted.shp'
 # bankfull_fp = 'GIS/data_inputs/Miranda/Bankfull_raster/SFE_Miranda_001_d_Max.tif' # preprocessing required to convert native .flt to .tif
@@ -31,17 +31,19 @@ median_bankfull = 227.647 # model-derived reach-averaged bankfull
 # reach_name = 'Miranda' # specify reach of the Eel River
 # median_bankfull = 72.284 # model-derived reach-averaged bankfull
 
-# transect_fp = 'GIS/data_inputs/Scotia/XS_Sections/Thalweg_15m_adjusted.shp'
-# bankfull_fp = 'GIS/data_inputs/Scotia/Bankfull_raster/SFE_Scotia_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
-# dem_fp = 'GIS/data_inputs/Scotia/1m_Topobathy/dem.tif'
-# reach_name = 'Scotia' # specify reach of the Eel River
-# median_bankfull = 22.244 # model-derived reach-averaged bankfull
+transect_fp = 'GIS/data_inputs/Scotia/XS_Sections/Thalweg_15m_adjusted.shp'
+bankfull_fp = 'GIS/data_inputs/Scotia/Bankfull_raster/SFE_Scotia_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
+dem_fp = 'GIS/data_inputs/Scotia/1m_Topobathy/dem.tif'
+reach_name = 'Scotia' # specify reach of the Eel River
+median_bankfull = 22.244 # model-derived reach-averaged bankfull
 
 # Create output folders if needed
 if not os.path.exists('data/data_outputs/{}'.format(reach_name)):
     os.makedirs('data/data_outputs/{}'.format(reach_name))
 if not os.path.exists('data/data_outputs/{}/derivative_plots'.format(reach_name)):
     os.makedirs('data/data_outputs/{}/derivative_plots'.format(reach_name))
+if not os.path.exists('data/data_outputs/{}/transect_plots'.format(reach_name)):
+    os.makedirs('data/data_outputs/{}/transect_plots'.format(reach_name))
 
 # Upload test data: transects, stations, and bankfull raster 
 transects = gpd.read_file(transect_fp)
@@ -114,7 +116,7 @@ def plot_bankfull():
         plt.legend()
         # Can I save each plot as an object, add it to a list, and return that list from this function?
         fig_list.append(fig)
-        # plt.savefig('data/data_outputs/{}/bankfull_transect_{}.jpeg'.format(reach_name, index))
+        plt.savefig('data/data_outputs/{}/transect_plots/bankfull_transect_{}.jpeg'.format(reach_name, index))
         plt.close()
     print('Median bankfull is {}m'.format(np.nanmedian(bankfull)))
     return(fig_list)
@@ -281,7 +283,7 @@ def calc_dwdh():
     plt.xlabel('Distance from channel bottom (m)')
     plt.ylabel('Channel width (m)')
     plt.title('Median incremental channel top widths for {}'.format(reach_name))
-    plt.axvline(227.647, label='median bankfull')
+    plt.axvline(median_bankfull, label='median bankfull')
     max_len = max(all_widths_df['widths'].apply(len)) # find the longest row in df
     all_widths_df['widths_padded'] = all_widths_df['widths'].apply(lambda x: np.pad(x, (0, max_len - len(x)), constant_values=np.nan)) # pad all shorter rows with nan
     padded_df = pd.DataFrame(all_widths_df['widths_padded'].tolist())
