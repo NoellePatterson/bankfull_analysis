@@ -20,13 +20,15 @@ from matplotlib import pyplot as plt
 import pdb
 
 # Run parameters 
-# transect_fp = 'GIS/data_inputs/Leggett/XS_Sections/Thalweg_10m_adjusted.shp'
-# bankfull_fp = 'GIS/data_inputs/Leggett/Bankfull_raster/SFE_Leggett_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
-# dem_fp = 'GIS/data_inputs/Leggett/1m_Topobathy/dem.tif'
-# reach_name = 'Leggett' # specify reach of the Eel River
-# median_bankfull = 227.647 # model-derived reach-averaged bankfull
-# median_topo_bankfull = 224.9 # topography-derived reach-averaged bankfull
-# modeled_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_modeled.csv'.format(reach_name))
+transect_fp = 'GIS/data_inputs/Leggett/XS_Sections/Thalweg_10m_adjusted.shp'
+bankfull_fp = 'GIS/data_inputs/Leggett/Bankfull_raster/SFE_Leggett_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
+dem_fp = 'GIS/data_inputs/Leggett/1m_Topobathy/dem.tif'
+reach_name = 'Leggett' # specify reach of the Eel River
+median_bankfull = 227.647 # model-derived reach-averaged bankfull
+median_topo_bankfull = 224.9 # topography-derived reach-averaged bankfull
+modeled_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_modeled.csv'.format(reach_name))
+topo_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
+plot_ylim = [220, 300]
 
 # transect_fp = 'GIS/data_inputs/Miranda/XS_Sections/Thalweg_10m_adjusted.shp'
 # bankfull_fp = 'GIS/data_inputs/Miranda/Bankfull_raster/SFE_Miranda_001_d_Max.tif' # preprocessing required to convert native .flt to .tif
@@ -35,14 +37,17 @@ import pdb
 # median_bankfull = 72.284 # model-derived reach-averaged bankfull
 # median_topo_bankfull = 68.4 # topography-derived reach-averaged bankfull
 # modeled_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_modeled.csv'.format(reach_name))
+# topo_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
+# plot_ylim = [60, 100]
 
-transect_fp = 'GIS/data_inputs/Scotia/XS_Sections/Thalweg_15m_adjusted.shp'
-bankfull_fp = 'GIS/data_inputs/Scotia/Bankfull_raster/SFE_Scotia_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
-dem_fp = 'GIS/data_inputs/Scotia/1m_Topobathy/dem.tif'
-reach_name = 'Scotia' # specify reach of the Eel River
-median_bankfull = 22.244 # model-derived reach-averaged bankfull
-median_topo_bankfull = 14.5 # topography-derived reach-averaged bankfull
-modeled_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_modeled.csv'.format(reach_name))
+# transect_fp = 'GIS/data_inputs/Scotia/XS_Sections/Thalweg_15m_adjusted.shp'
+# bankfull_fp = 'GIS/data_inputs/Scotia/Bankfull_raster/SFE_Scotia_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
+# dem_fp = 'GIS/data_inputs/Scotia/1m_Topobathy/dem.tif'
+# reach_name = 'Scotia' # specify reach of the Eel River
+# median_bankfull = 22.244 # model-derived reach-averaged bankfull
+# median_topo_bankfull = 14.5 # topography-derived reach-averaged bankfull
+# modeled_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_modeled.csv'.format(reach_name))
+# topo_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
 
 # Create output folders if needed
 if not os.path.exists('data/data_outputs/{}'.format(reach_name)):
@@ -67,7 +72,7 @@ dem = rasterio.open(dem_fp)
 bankfull_footprint = raster_footprint.footprint_from_rasterio_reader(bankfull, destination_crs = bankfull.crs)
 bankfull_footprint = shape(bankfull_footprint)
 bankfull_boundary = bankfull_footprint.boundary
-bankfull_boundary = gpd.GeoDataFrame({'geometry': [bankfull_boundary]}, crs=bankfull.crs)
+bankfull_boundary = gpd.GeoDataFrame({'geometry':[bankfull_boundary]}, crs=bankfull.crs)
 
 interval = 1 # set plotting interval in units of meters
 
@@ -124,6 +129,8 @@ def plot_bankfull():
         current_widths = pd.read_csv('data/data_outputs/{}/all_widths/widths_{}.csv'.format(reach_name, index))
         current_widths = current_widths['widths']
         width_xvals = get_x_vals(current_widths)
+        # Bring in topo bankfull data
+        current_topo_bankfull = topo_bankfull_transects_df['bankfull'][index]
         # Bring in rate of change data
         dw = pd.read_csv('data/data_outputs/{}/first_order_roc/first_order_roc_{}.csv'.format(reach_name, index))
         dw_xvals = get_x_vals(dw)
@@ -140,19 +147,34 @@ def plot_bankfull():
         # Create empty plotline with blank marker containing bankfull label
         bankfull_label = str(round(bankfull_z_plot_avg, 2))
         ax1.plot([], [], ' ', label="Bankfull elev={}m".format(bankfull_label))
-        ax1.axhline(median_bankfull, color='grey', linestyle='dashed', label='modeled median bankfull')
+        try: 
+            ax2.set_ylim(plot_ylim)
+            ax3.set_ylim(plot_ylim)
+        except:
+            print('No xlim provided')     
+        ax1.axhline(current_topo_bankfull, color='grey', linestyle='dashed', label='topo-derived bankfull')
         ax1.set_xlabel('Meters')
-        ax1.set_ylabel('Elevation (Meters)')
+        ax1.set_ylabel('Elevation (meters)')
         ax1.set_title('Eel River at {}'.format(reach_name))
         ax1.legend()
-        ax2.plot(width_xvals, current_widths)
+        ax2.plot(current_widths, width_xvals, label='first order rate of change')
+        ax2.axhline(bankfull_plot_df['bankfull_z'][0], color='red', label='model-derived bankfull', alpha=0.5)
+        ax2.axhline(current_topo_bankfull, color='grey', linestyle='dashed', label='topo-derived bankfull', alpha=0.5)
+        ax2.set_ylabel('Elevation (meters)')
+        ax25 = ax2.twiny()
+        ax25.plot(stations_plot_df['station_y'], stations_plot_df['station_z'], color='grey', linestyle='-', label='Transect')
         ax2.set_title('Cross-section and first-order rate of change')
-        ax3.plot(ddw_xvals, ddw)
+        ax3.plot(ddw, ddw_xvals)
+        ax3.set_ylabel('Elevation (meters)')
+        ax3.axhline(bankfull_plot_df['bankfull_z'][0], color='red', label='model-derived bankfull')
+        ax3.axhline(current_topo_bankfull, color='grey', linestyle='dashed', label='topo-derived bankfull')
+        ax35 = ax3.twiny()
+        ax35.plot(stations_plot_df['station_y'], stations_plot_df['station_z'], color='grey', linestyle='-', label='Transect')
         ax3.set_title('Second order rate of change')
-        ax3.axvline(median_bankfull, linestyle='dashed', label='2D model bankfull med={}'.format(median_bankfull))
+        plt.tight_layout()
         # Can I save each plot as an object, add it to a list, and return that list from this function?
-        fig_list.append(fig)
-        # plt.savefig('data/data_outputs/{}/transect_plots/bankfull_transect_{}.jpeg'.format(reach_name, index))
+        # fig_list.append(fig)
+        plt.savefig('data/data_outputs/{}/transect_plots/bankfull_transect_{}.jpeg'.format(reach_name, index))
         plt.close()
 
         
@@ -250,11 +272,16 @@ def calc_dwdh():
             wh_ls.append(width)
 
         wh_ls_df = pd.DataFrame({'widths':wh_ls})
-        wh_ls_df.to_csv('data/data_outputs/{}/all_widths/widths_{}.csv'.format(reach_name, transects_index))
+        # wh_ls_df.to_csv('data/data_outputs/{}/all_widths/widths_{}.csv'.format(reach_name, transects_index))
         wh_append = pd.DataFrame({'widths':[wh_ls], 'transect_id':transects_index})
         all_widths_df = pd.concat([all_widths_df, wh_append], ignore_index=True)
 
     # calculate and plot second derivative of width (height is constant)
+    def get_x_vals(y_vals):
+        x_len = round(len(y_vals) * d_interval, 4)
+        x_vals = np.arange(0, x_len, d_interval)
+        return(x_vals)
+
     bankfull_results = []
     for x_index, xsection in enumerate(all_widths_df['widths']): # loop through all x-sections
         dw = []
@@ -273,16 +300,16 @@ def calc_dwdh():
         max_ddw_index = ddw_abs.index(max_ddw)
         bankfull_id_elevation = d_interval * max_ddw_index # sea-level elevation corresponding with bankfull
         bankfull_results.append(bankfull_id_elevation)
-        dw_df = pd.DataFrame({'dw':dw})
-        ddw_df = pd.DataFrame({'ddw':ddw})
+        # Output dw/ddw spacing, which is in 1/10 meter increments
+        dw_xvals = get_x_vals(dw)
+        ddw_xvals = get_x_vals(ddw)
+        dw_df = pd.DataFrame({'elevation_m':dw_xvals, 'dw':dw})
+        ddw_df = pd.DataFrame({'elevation_m':ddw_xvals, 'ddw':ddw})
         dw_df.to_csv('data/data_outputs/{}/first_order_roc/first_order_roc_{}.csv'.format(reach_name, x_index))
         ddw_df.to_csv('data/data_outputs/{}/second_order_roc/second_order_roc_{}.csv'.format(reach_name, x_index))
 
         # Plot x-section/first/second derivative plot and identified bankfull
-        def get_x_vals(y_vals):
-            x_len = round(len(y_vals) * d_interval, 4)
-            x_vals = np.arange(0, x_len, d_interval)
-            return(x_vals)
+        
         x_section_xvals = get_x_vals(xsection)
         dw_xvals = get_x_vals(dw)
         ddw_xvals = get_x_vals(ddw)
@@ -320,7 +347,7 @@ def calc_dwdh():
     plt.axhline(median_bankfull, linestyle='dashed', color='black', label='modeled median bankfull') 
     plt.axhline(median_topo_bankfull, linestyle='dashed', color='grey', label='topographic median bankfull')
     plt.legend(loc='upper right')
-    plt.savefig('data/data_outputs/{}/Bankfull_longitudinals'.format(reach_name))
+    # plt.savefig('data/data_outputs/{}/Bankfull_longitudinals'.format(reach_name))
     plt.close()
     breakpoint()
 
@@ -347,6 +374,9 @@ def calc_dwdh():
                 plt.legend()
         # plt.savefig('data/data_outputs/{}/all_widths_xs-{}.jpeg'.format(reach_name, str(xs_name)), dpi=400)
         plt.close()
+    # save topo-derived bankfull for each transect
+    bankfull_results_dt = pd.DataFrame({'bankfull':bankfull_results})
+    bankfull_results_dt.to_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
 
     # Plot average and bounds on all widths
     # calc element-wise avg, 25th, & 75th percentile of each width increment
@@ -370,5 +400,5 @@ def calc_dwdh():
     # plt.savefig('data/data_outputs/{}/median_widths.jpeg'.format(reach_name), dpi=400)
     # after calcing array of w/d for each xs, calc the deltas
 
-# output = plot_bankfull() 
-output = calc_dwdh()
+output = plot_bankfull() 
+# output = calc_dwdh()
