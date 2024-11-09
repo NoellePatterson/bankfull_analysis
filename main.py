@@ -20,24 +20,24 @@ from matplotlib import pyplot as plt
 import sys
 import pdb
 from analysis import calc_dwdh, calc_derivatives
+from visualization import plot_bankfull_increments
 
-reach_name = 'Leggett' # Choose 'Leggett' or 'Miranda' or 'Scotia'
+reach_name = 'Scotia' # Choose 'Leggett' or 'Miranda' or 'Scotia'
 
 # Assign run parameters based on reach name
-
 if reach_name == 'Leggett': 
     transect_fp = 'GIS/data_inputs/Leggett/XS_Sections/Thalweg_10m_adjusted.shp'
-    bankfull_fp = 'GIS/data_inputs/Leggett/Bankfull_raster/SFE_Leggett_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
+    bankfull_fp = 'GIS/data_inputs/Leggett/Bankfull_raster/SFE_Leggett_011_d_010_00.tif' # preprocessing required to convert native .flt to .tif
     dem_fp = 'GIS/data_inputs/Leggett/1m_Topobathy/dem.tif'
     median_bankfull = 227.647 # model-derived reach-averaged bankfull
     median_topo_bankfull = 224.9 # topography-derived reach-averaged bankfull
     modeled_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_modeled.csv'.format(reach_name))
     topo_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
-    plot_ylim = [220, 300]
+    plot_ylim = [220, 270]
 
 elif reach_name == 'Miranda':
     transect_fp = 'GIS/data_inputs/Miranda/XS_Sections/Thalweg_10m_adjusted.shp'
-    bankfull_fp = 'GIS/data_inputs/Miranda/Bankfull_raster/SFE_Miranda_001_d_Max.tif' # preprocessing required to convert native .flt to .tif
+    bankfull_fp = 'GIS/data_inputs/Miranda/Bankfull_raster/SFE_Miranda_011_d_010_00.tif' # preprocessing required to convert native .flt to .tif
     dem_fp = 'GIS/data_inputs/Miranda/1m_Topobathy/dem.tif'
     median_bankfull = 72.284 # model-derived reach-averaged bankfull
     median_topo_bankfull = 68.4 # topography-derived reach-averaged bankfull
@@ -47,7 +47,7 @@ elif reach_name == 'Miranda':
 
 elif reach_name == 'Scotia':
     transect_fp = 'GIS/data_inputs/Scotia/XS_Sections/Thalweg_15m_adjusted.shp'
-    bankfull_fp = 'GIS/data_inputs/Scotia/Bankfull_raster/SFE_Scotia_011_d_Max.tif' # preprocessing required to convert native .flt to .tif
+    bankfull_fp = 'GIS/data_inputs/Scotia/Bankfull_raster/SFE_Scotia_011_d_010_00.tif' # preprocessing required to convert native .flt to .tif
     dem_fp = 'GIS/data_inputs/Scotia/1m_Topobathy/dem.tif'
     median_bankfull = 22.244 # model-derived reach-averaged bankfull
     median_topo_bankfull = 14.5 # topography-derived reach-averaged bankfull
@@ -86,5 +86,10 @@ bankfull_boundary = gpd.GeoDataFrame({'geometry':[bankfull_boundary]}, crs=bankf
 plot_interval = 1 # set plotting interval along transect in units of meters
 d_interval = 10/100 # Set intervals to step up in depth (in units meters). 10cm intervals
 
-all_widths_df = calc_dwdh()
-output = calc_derivatives()
+# Uncomment functions to run
+all_widths_df = calc_dwdh(reach_name, transects, dem, plot_interval, d_interval)
+output = calc_derivatives(reach_name, d_interval, all_widths_df)
+# breakpoint()
+
+
+output = plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull, plot_ylim=None)

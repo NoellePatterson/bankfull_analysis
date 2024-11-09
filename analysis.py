@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import geopandas as gpd
+from scipy.stats import linregress
 
 def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval):
     # Loop through xsections and create dw/dh array for each xsection
@@ -76,26 +77,41 @@ def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval):
         wh_ls_df.to_csv('data/data_outputs/{}/all_widths/widths_{}.csv'.format(reach_name, transects_index))
         wh_append = pd.DataFrame({'widths':[wh_ls], 'transect_id':transects_index})
         all_widths_df = pd.concat([all_widths_df, wh_append], ignore_index=True)
+    return(all_widths_df)
 
-def calc_derivatives(d_interval, all_widths_df):
+def calc_derivatives(reach_name, d_interval, all_widths_df):
     # calculate and plot second derivative of width (height is constant)
     def get_x_vals(y_vals):
         x_len = round(len(y_vals) * d_interval, 4)
         x_vals = np.arange(0, x_len, d_interval)
         return(x_vals)
+    
+    def multipoint_slope(windowsize, timeseries, xvals):
+        dw = np.zeros(len(timeseries))
+        lr_window = int(windowsize/2) # indexing later requires this to be an integer
+        for n in range(lr_window, len(timeseries) - lr_window):
+            regress = timeseries[n - lr_window:n + lr_window]
+            slope1, intercept1, r_value1, p_value1, std_err1 = linregress(xvals[n - lr_window:n + lr_window], regress)
+            dw[n] = slope1  
+        return dw  
 
     bankfull_results = []
     for x_index, xsection in enumerate(all_widths_df['widths']): # loop through all x-sections
         dw = []
         ddw = []
-        for w_index, current_width in enumerate(xsection): # loop through all widths in current xsection
-            if w_index < len(xsection) - 1: # can caluclate differences up to second to last index
-                current_d = (xsection[w_index + 1] - current_width)/d_interval
-                dw.append(current_d)
-        for dw_index, current_dw in enumerate(dw): # loop through all first order rate changes to get second order change  (slope break)
-            if dw_index < len(dw) - 1: # can calculate differences up to second to last first-order change
-                current_dd = (dw[dw_index + 1] - current_dw)/d_interval
-                ddw.append(current_dd)
+        xs_xvals = get_x_vals(xsection)
+        dw = multipoint_slope(5, xsection, xs_xvals)
+        ddw = multipoint_slope(5, dw, xs_xvals)
+        # Strategy #1: calc stepwise slopes (bench style?) 
+        # for w_index, current_width in enumerate(xsection): # loop through all widths in current xsection
+        #     if w_index < len(xsection) - 1: # can caluclate differences up to second to last index
+        #         current_d = (xsection[w_index + 1] - current_width)/d_interval
+        #         dw.append(current_d)
+        # for dw_index, current_dw in enumerate(dw): # loop through all first order rate changes to get second order change  (slope break)
+        #     if dw_index < len(dw) - 1: # can calculate differences up to second to last first-order change
+        #         current_dd = (dw[dw_index + 1] - current_dw)/d_interval
+        #         ddw.append(current_dd)
+
         # Find max second derivative as bankfull
         ddw_abs = [abs(i) for i in ddw]
         max_ddw = np.nanmax(ddw_abs)
@@ -109,3 +125,7 @@ def calc_derivatives(d_interval, all_widths_df):
         ddw_df = pd.DataFrame({'elevation_m':ddw_xvals, 'ddw':ddw})
         dw_df.to_csv('data/data_outputs/{}/first_order_roc/first_order_roc_{}.csv'.format(reach_name, x_index))
         ddw_df.to_csv('data/data_outputs/{}/second_order_roc/second_order_roc_{}.csv'.format(reach_name, x_index))
+
+    # save topo-derived bankfull for each transect
+    bankfull_results_dt = pd.DataFrame({'bankfull':bankfull_results})
+    bankfull_results_dt.to_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))

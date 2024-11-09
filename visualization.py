@@ -105,8 +105,6 @@ def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plo
 
     return()
 
-
-
 def plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, median_bankfull, median_topo_bankfull):
     # Plot bankfull results along logitudinal profile
     modeled_bankfull_transects = modeled_bankfull_transects_df['bankfull_ams']
@@ -131,7 +129,7 @@ def plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, median_bankf
     plt.close()
     breakpoint()
 
-def plot_bankfull_increments(reach_name, all_widths_df, d_interval, bankfull_results, median_bankfull, plot_ylim):
+def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull, plot_ylim):
     plot_xss = [2,42,88,91,181,217]
     # Plot all widths spaghetti style
     for xs in plot_xss:
@@ -139,7 +137,7 @@ def plot_bankfull_increments(reach_name, all_widths_df, d_interval, bankfull_res
         plt.xlabel('Distance from 0-elevation (m)')
         plt.ylabel('Channel width (m)')
         plt.title('Incremental channel top widths for {}'.format(reach_name))
-        plt.axvline(22.244, label='median bankfull')
+        # plt.axvline(22.244, label='median bankfull')
         try: 
             plt.ylim(plot_ylim)
         except:
@@ -152,19 +150,15 @@ def plot_bankfull_increments(reach_name, all_widths_df, d_interval, bankfull_res
                 xs_name = index
                 plt.plot(x_vals, row[0], linewidth=2.5, label='x-section {}'.format(index), zorder=len(all_widths_df), color='red')
                 plt.legend()
-        plt.savefig('data/data_outputs/{}/all_widths_xs-{}.jpeg'.format(reach_name, str(xs_name)), dpi=400)
+        # plt.savefig('data/data_outputs/{}/all_widths_xs-{}.jpeg'.format(reach_name, str(xs_name)), dpi=400)
         plt.close()
-    # save topo-derived bankfull for each transect
-    bankfull_results_dt = pd.DataFrame({'bankfull':bankfull_results})
-    bankfull_results_dt.to_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
 
     # Plot average and bounds on all widths
     # calc element-wise avg, 25th, & 75th percentile of each width increment
     fig, ax = plt.subplots()
-    plt.xlabel('Distance from channel bottom (m)')
+    plt.xlabel('Distance from 0-elevation (m)')
     plt.ylabel('Channel width (m)')
     plt.title('Median incremental channel top widths for {}'.format(reach_name))
-    plt.axvline(median_bankfull, label='median bankfull')
     max_len = max(all_widths_df['widths'].apply(len)) # find the longest row in df
     all_widths_df['widths_padded'] = all_widths_df['widths'].apply(lambda x: np.pad(x, (0, max_len - len(x)), constant_values=np.nan)) # pad all shorter rows with nan
     padded_df = pd.DataFrame(all_widths_df['widths_padded'].tolist())
@@ -173,10 +167,18 @@ def plot_bankfull_increments(reach_name, all_widths_df, d_interval, bankfull_res
     transect_75 = padded_df.apply(lambda row: np.nanpercentile(row, 75), axis=0)
     x_len = round(len(transect_50) * d_interval, 4)
     x_vals = np.arange(0, x_len, d_interval)
-    plt.xlim([210, 300])
+    if reach_name == 'Scotia':
+        plt.xlim([10, 35]) # truncate unneeded values from plot
+    if reach_name == 'Miranda':
+        plt.xlim(plot_ylim)
+    if reach_name == 'Leggett':
+        plt.xlim(plot_ylim)
     plt.plot(x_vals, transect_50, color='black')
     plt.plot(x_vals, transect_25, color='blue')
     plt.plot(x_vals, transect_75, color='blue')
+    plt.axvline(median_bankfull, label='median modeled bankfull', color='black', linestyle='dashed')
+    plt.axvline(median_topo_bankfull, label='median topo bankfull', color='grey', linestyle='dashed')
+    plt.legend()
     plt.savefig('data/data_outputs/{}/median_widths.jpeg'.format(reach_name), dpi=400)
 
 
