@@ -94,6 +94,31 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
             slope1, intercept1, r_value1, p_value1, std_err1 = linregress(xvals[n - lr_window:n + lr_window], regress)
             dw[n] = slope1  
         return dw  
+    
+    def find_boundary(xsection, bound):
+        for index, val in enumerate(xsection):
+            if val > bound: # find first instance of exceeding lower width bound
+                bound_index = index
+                break
+        return bound_index
+    
+    # Calc upper and lower bounds widths
+    lower_ls = []
+    upper_ls = []
+    for x_index, xsection in enumerate(all_widths_df['widths']): # loop through all x-sections
+        for i, val in enumerate(xsection):
+            if val > 0: # ID first instance when width exceeds zero, set as thalweg start point
+                start_width_index = i
+                break
+        width_lower = xsection[start_width_index + 5] # width at 0.5m above thalweg
+        lower_ls.append(width_lower)
+        try:
+            width_upper = xsection[start_width_index + 100] # width at 10m above thalweg
+            upper_ls.append(width_upper)
+        except:
+            continue
+    lower = np.nanmedian(lower_ls)
+    upper = np.nanmedian(upper_ls)
 
     bankfull_results = []
     for x_index, xsection in enumerate(all_widths_df['widths']): # loop through all x-sections
@@ -112,9 +137,12 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
         #         current_dd = (dw[dw_index + 1] - current_dw)/d_interval
         #         ddw.append(current_dd)
 
-        # Find max second derivative as bankfull
+        # Find max second derivative as bankfull. turn this into a function... 
         ddw_abs = [abs(i) for i in ddw]
-        max_ddw = np.nanmax(ddw_abs)
+        # Add in upper and lower search bounds on max 2nd deriv bankfull ID
+        lower_bound_index = find_boundary(xsection, lower)
+        upper_bound_index = find_boundary(xsection, upper)
+        max_ddw = np.nanmax(ddw_abs[lower_bound_index:upper_bound_index])
         max_ddw_index = ddw_abs.index(max_ddw)
         bankfull_id_elevation = d_interval * max_ddw_index # sea-level elevation corresponding with bankfull
         bankfull_results.append(bankfull_id_elevation)

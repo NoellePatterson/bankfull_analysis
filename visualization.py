@@ -102,17 +102,21 @@ def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plo
         plt.tight_layout()
         plt.savefig('data/data_outputs/{}/transect_plots/bankfull_transect_{}.jpeg'.format(reach_name, index))
         plt.close()
+    bankfull_df = pd.DataFrame({'bankfull_ams':bankfull})
+    bankfull_df.to_csv('data/data_outputs/{}/transect_bankfull_modeled.csv'.format(reach_name))
 
     return()
 
-def plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, median_bankfull, median_topo_bankfull):
+def plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull):
     # Plot bankfull results along logitudinal profile
     modeled_bankfull_transects = modeled_bankfull_transects_df['bankfull_ams']
     modeled_bankfull_transects = [np.nan if x < 0 else x for x in modeled_bankfull_transects]
+    bankfull_results = topo_bankfull_transects_df['bankfull']
     if reach_name == 'Leggett' or reach_name == 'Miranda':
         transect_spacing = 10 # units meters
     elif reach_name == 'Scotia':
-        bankfull_results = bankfull_results[:-1]
+        bankfull_results = bankfull_results[:-1] # remove erroneous final value
+        modeled_bankfull_transects = modeled_bankfull_transects[:-1]
         transect_spacing = 15 # units meters
     x_len = len(bankfull_results)
     x_vals = np.arange(0, (x_len * transect_spacing), transect_spacing)
@@ -127,7 +131,6 @@ def plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, median_bankf
     plt.legend(loc='upper right')
     plt.savefig('data/data_outputs/{}/Bankfull_longitudinals'.format(reach_name))
     plt.close()
-    breakpoint()
 
 def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull, plot_ylim):
     plot_xss = [2,42,88,91,181,217]
