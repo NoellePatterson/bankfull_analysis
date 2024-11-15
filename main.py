@@ -19,7 +19,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import sys
 import pdb
-from analysis import calc_dwdh, calc_derivatives
+from analysis import calc_dwdh, calc_derivatives, calc_derivatives_aggregate
 from visualization import plot_bankfull, plot_bankfull_increments, plot_longitudinal_bf
 
 reach_name = 'Scotia' # Choose 'Leggett' or 'Miranda' or 'Scotia'
@@ -89,9 +89,10 @@ d_interval = 10/100 # Set intervals to step up in depth (in units meters). 10cm 
 # Uncomment functions to run
 all_widths_df = calc_dwdh(reach_name, transects, dem, plot_interval, d_interval)
 print('Dwdh calc done!!')
-output = calc_derivatives(reach_name, d_interval, all_widths_df)
-print('Derivatives calc done!!')
+# output = calc_derivatives(reach_name, d_interval, all_widths_df)
+# print('Derivatives calc done!!')
+# output = calc_derivatives_aggregate(reach_name, d_interval, all_widths_df)
 
-output = plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval, topo_bankfull_transects_df, plot_ylim=None)
-output = plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull)
+# output = plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval, topo_bankfull_transects_df, plot_ylim=None)
+# output = plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull)
 output = plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull, plot_ylim=None)

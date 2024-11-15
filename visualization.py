@@ -5,7 +5,7 @@ from shapely.geometry import Point, shape, MultiPoint
 from shapely.geometry.point import Point
 import matplotlib.pyplot as plt
 
-def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval, topo_bankfull_transects_df, plot_ylim):
+def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval, topo_bankfull_transects_df, plot_ylim=None):
     d_interval = 10/100 # units meters
     # For each transect, find intersection points with bankfull, and plot transects with intersections
     bankfull = []

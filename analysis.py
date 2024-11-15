@@ -3,6 +3,27 @@ import numpy as np
 import geopandas as gpd
 from scipy.stats import linregress
 
+def get_x_vals(y_vals, d_interval):
+        x_len = round(len(y_vals) * d_interval, 4)
+        x_vals = np.arange(0, x_len, d_interval)
+        return(x_vals)
+    
+def multipoint_slope(windowsize, timeseries, xvals):
+    dw = np.zeros(len(timeseries))
+    lr_window = int(windowsize/2) # indexing later requires this to be an integer
+    for n in range(lr_window, len(timeseries) - lr_window):
+        regress = timeseries[n - lr_window:n + lr_window]
+        slope1, intercept1, r_value1, p_value1, std_err1 = linregress(xvals[n - lr_window:n + lr_window], regress)
+        dw[n] = slope1  
+    return dw  
+    
+def find_boundary(xsection, bound):
+    for index, val in enumerate(xsection):
+        if val > bound: # find first instance of exceeding lower width bound
+            bound_index = index
+            break
+    return bound_index
+
 def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval):
     # Loop through xsections and create dw/dh array for each xsection
     # df to store arrays of w and h
@@ -81,27 +102,6 @@ def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval):
 
 def calc_derivatives(reach_name, d_interval, all_widths_df):
     # calculate and plot second derivative of width (height is constant)
-    def get_x_vals(y_vals):
-        x_len = round(len(y_vals) * d_interval, 4)
-        x_vals = np.arange(0, x_len, d_interval)
-        return(x_vals)
-    
-    def multipoint_slope(windowsize, timeseries, xvals):
-        dw = np.zeros(len(timeseries))
-        lr_window = int(windowsize/2) # indexing later requires this to be an integer
-        for n in range(lr_window, len(timeseries) - lr_window):
-            regress = timeseries[n - lr_window:n + lr_window]
-            slope1, intercept1, r_value1, p_value1, std_err1 = linregress(xvals[n - lr_window:n + lr_window], regress)
-            dw[n] = slope1  
-        return dw  
-    
-    def find_boundary(xsection, bound):
-        for index, val in enumerate(xsection):
-            if val > bound: # find first instance of exceeding lower width bound
-                bound_index = index
-                break
-        return bound_index
-    
     # Calc upper and lower bounds widths
     lower_ls = []
     upper_ls = []
@@ -124,7 +124,7 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
     for x_index, xsection in enumerate(all_widths_df['widths']): # loop through all x-sections
         dw = []
         ddw = []
-        xs_xvals = get_x_vals(xsection)
+        xs_xvals = get_x_vals(xsection, d_interval)
         dw = multipoint_slope(5, xsection, xs_xvals)
         ddw = multipoint_slope(5, dw, xs_xvals)
         # Strategy #1: calc stepwise slopes (bench style?) 
@@ -147,8 +147,8 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
         bankfull_id_elevation = d_interval * max_ddw_index # sea-level elevation corresponding with bankfull
         bankfull_results.append(bankfull_id_elevation)
         # Output dw/ddw spacing, which is in 1/10 meter increments
-        dw_xvals = get_x_vals(dw)
-        ddw_xvals = get_x_vals(ddw)
+        dw_xvals = get_x_vals(dw, d_interval)
+        ddw_xvals = get_x_vals(ddw, d_interval)
         dw_df = pd.DataFrame({'elevation_m':dw_xvals, 'dw':dw})
         ddw_df = pd.DataFrame({'elevation_m':ddw_xvals, 'ddw':ddw})
         dw_df.to_csv('data/data_outputs/{}/first_order_roc/first_order_roc_{}.csv'.format(reach_name, x_index))
@@ -157,3 +157,62 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
     # save topo-derived bankfull for each transect
     bankfull_results_dt = pd.DataFrame({'bankfull':bankfull_results})
     bankfull_results_dt.to_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
+
+def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df):
+    # average all xsection widths element-wise
+    all_widths = all_widths_df['widths']
+    max_len = max(len(ls) for ls in all_widths)
+    all_widths_padded = [ls + [None] * (max_len - len(ls)) for ls in all_widths]
+    # code to calculate element-wise average (from GPT)
+    avg_width = [
+        np.nanmedian([x for x in elements if x is not None])
+        for elements in zip(*all_widths_padded)
+    ]
+    xs_xvals = get_x_vals(avg_width, d_interval)
+    dw = multipoint_slope(10, avg_width, xs_xvals)
+    ddw = multipoint_slope(10, dw, xs_xvals)
+    # apply rolling avg derivative calcs
+    # ID bankfull (one across entire reach), save in csv
+    ddw_abs = [abs(i) for i in ddw]
+    # Add in upper and lower search bounds on max 2nd deriv bankfull ID
+    for i, val in enumerate(avg_width):
+            if val > 0: # ID first instance when width exceeds zero, set as thalweg start point
+                start_width_index = i
+                break
+    lower_bound_index = start_width_index + 5 # lower bound set at 0.5m above thalweg
+    upper_bound_index = start_width_index + 100 # upper bound set at 10m above thalweg
+    max_ddw = np.nanmax(ddw_abs[lower_bound_index:upper_bound_index])
+    max_ddw_index = ddw_abs.index(max_ddw)
+    ddw = ddw.tolist()
+    max_neg_ddw = np.nanmin(ddw[lower_bound_index:upper_bound_index])
+    max_neg_ddw_index = ddw.index(max_neg_ddw)
+    bankfull_id_elevation = d_interval * max_ddw_index # sea-level elevation corresponding with bankfull
+    # figure this out with a plot...
+    # avg_width = avg_width[:400] # chop off noisy end of data
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(3, 1, figsize=(15,15))
+    # plt.xlim((600,900)) (2200,2500) (50,400)
+    axes[0].plot(avg_width)
+    axes[0].axvline(max_ddw_index, label='2nd derivative abs maxima')
+    axes[0].axvline(max_neg_ddw_index, label='2nd derivative minima', color='black')
+    axes[0].set_title('Median channel widths')
+    axes[0].set_xlim((50,400))
+    axes[1].plot(dw)
+    axes[1].axvline(max_ddw_index, label='2nd derivative abs maxima')
+    axes[1].axvline(max_neg_ddw_index, label='2nd derivative minima', color='black')
+    axes[1].set_xlim((50,400))
+    # axes[1].set_ylim((-200,100))
+    axes[1].set_title('First derivative')
+    axes[2].plot(ddw)
+    axes[2].axvline(max_ddw_index, label='2nd derivative abs maxima')
+    axes[2].axvline(max_neg_ddw_index, label='2nd derivative minima', color='black')
+    axes[2].set_xlim((50,400))
+    # axes[2].set_ylim((-1000,1000))
+    axes[2].set_title('Second derivative')
+    plt.legend()
+    
+    fig.suptitle('Brankfull slope identification for {} with 10pt rolling avg'.format(reach_name))
+    plt.savefig('data/data_outputs/{}_slopes_fig.jpeg'.format(reach_name))
+
+    # there it is! 
+    breakpoint()
