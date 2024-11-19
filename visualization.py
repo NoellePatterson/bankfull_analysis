@@ -4,6 +4,8 @@ import numpy as np
 from shapely.geometry import Point, shape, MultiPoint
 from shapely.geometry.point import Point
 import matplotlib.pyplot as plt
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize
 
 def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval, topo_bankfull_transects_df, plot_ylim=None):
     d_interval = 10/100 # units meters
@@ -132,29 +134,33 @@ def plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, topo_bankful
     plt.savefig('data/data_outputs/{}/Bankfull_longitudinals'.format(reach_name))
     plt.close()
 
-def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull, plot_ylim):
-    plot_xss = [2,42,88,91,181,217]
+def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull, bankfull_width, plot_ylim):
+    # Create color ramp 
+    cmap = plt.cm.viridis
+    norm = Normalize(vmin=0, vmax=len(all_widths_df)-1)
     # Plot all widths spaghetti style
-    for xs in plot_xss:
-        fig, ax = plt.subplots()
-        plt.xlabel('Distance from 0-elevation (m)')
-        plt.ylabel('Channel width (m)')
-        plt.title('Incremental channel top widths for {}'.format(reach_name))
-        # plt.axvline(22.244, label='median bankfull')
-        try: 
-            plt.ylim(plot_ylim)
-        except:
-            print('No ylim provided')
-        for index, row in all_widths_df.iterrows():
-            x_len = round(len(row[0]) * d_interval, 4)
-            x_vals = np.arange(0, x_len, d_interval)
-            plt.plot(x_vals, row[0], alpha=0.3)
-            if index == xs:
-                xs_name = index
-                plt.plot(x_vals, row[0], linewidth=2.5, label='x-section {}'.format(index), zorder=len(all_widths_df), color='red')
-                plt.legend()
-        # plt.savefig('data/data_outputs/{}/all_widths_xs-{}.jpeg'.format(reach_name, str(xs_name)), dpi=400)
-        plt.close()
+    fig, ax = plt.subplots()
+    plt.xlabel('Distance from 0-elevation (m)')
+    plt.ylabel('Channel width (m)')
+    plt.title('Incremental channel top widths for {}'.format(reach_name))
+    # try: 
+    #     plt.xlim(plot_ylim)
+    # except:
+    #     print('No ylim provided')
+    plt.xlim([220, 270])
+    for index, row in all_widths_df.iterrows():
+        x_len = round(len(row[0]) * d_interval, 4)
+        x_vals = np.arange(0, x_len, d_interval)
+        plt.plot(x_vals, row[0], alpha=0.3, color=cmap(norm(index)), linewidth=0.75)
+    plt.axhline(bankfull_width, label='Median width at modeled bankfull'.format(str(median_bankfull)), color='black', linewidth=0.75)
+    sm = ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])  # Set array to avoid warnings
+    cbar = plt.colorbar(sm, ax=ax)
+    plt.legend()
+    cbar.set_label("Downstream distance (m)")
+    plt.savefig('data/data_outputs/{}/all_widths.jpeg'.format(reach_name), dpi=400)
+    plt.close()
+    breakpoint()
 
     # Plot average and bounds on all widths
     # calc element-wise avg, 25th, & 75th percentile of each width increment
@@ -171,7 +177,7 @@ def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankful
     x_len = round(len(transect_50) * d_interval, 4)
     x_vals = np.arange(0, x_len, d_interval)
     if reach_name == 'Scotia':
-        plt.xlim([10, 35]) # truncate unneeded values from plot
+        plt.xlim(plot_ylim) # truncate unneeded values from plot
     if reach_name == 'Miranda':
         plt.xlim(plot_ylim)
     if reach_name == 'Leggett':
@@ -182,6 +188,6 @@ def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankful
     plt.axvline(median_bankfull, label='median modeled bankfull', color='black', linestyle='dashed')
     plt.axvline(median_topo_bankfull, label='median topo bankfull', color='grey', linestyle='dashed')
     plt.legend()
-    plt.savefig('data/data_outputs/{}/median_widths.jpeg'.format(reach_name), dpi=400)
+    # plt.savefig('data/data_outputs/{}/median_widths.jpeg'.format(reach_name), dpi=400)
 
 

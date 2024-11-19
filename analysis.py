@@ -24,10 +24,11 @@ def find_boundary(xsection, bound):
             break
     return bound_index
 
-def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval):
+def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval, median_bankfull):
     # Loop through xsections and create dw/dh array for each xsection
     # df to store arrays of w and h
     all_widths_df = pd.DataFrame(columns=['widths'])
+    bankfull_width_ls = [] # using modeled bankfull, track channel width at bankfull for each transect
     incomplete_intersection_counter = 0
     total_measurements = 0
     # for transect in transects:
@@ -93,12 +94,17 @@ def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval):
                 width = np.nan
                 incomplete_intersection_counter += 1 
             wh_ls.append(width)
-
+            depth_0elev = round(d_interval * depth, 1)
+            bankfull = round(median_bankfull, 1)
+            if depth_0elev == bankfull:
+                bankfull_width_ls.append(width)
+        
         wh_ls_df = pd.DataFrame({'widths':wh_ls})
         wh_ls_df.to_csv('data/data_outputs/{}/all_widths/widths_{}.csv'.format(reach_name, transects_index))
         wh_append = pd.DataFrame({'widths':[wh_ls], 'transect_id':transects_index})
         all_widths_df = pd.concat([all_widths_df, wh_append], ignore_index=True)
-    return(all_widths_df)
+    bankfull_width = np.nanmedian(bankfull_width_ls)
+    return(all_widths_df, bankfull_width)
 
 def calc_derivatives(reach_name, d_interval, all_widths_df):
     # calculate and plot second derivative of width (height is constant)
