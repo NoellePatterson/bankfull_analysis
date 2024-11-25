@@ -22,7 +22,7 @@ import pdb
 from analysis import calc_dwdh, calc_derivatives, calc_derivatives_aggregate
 from visualization import plot_bankfull, plot_bankfull_increments, plot_longitudinal_bf
 
-reach_name = 'Leggett' # Choose 'Leggett' or 'Miranda' or 'Scotia'
+reach_name = 'Scotia' # Choose 'Leggett' or 'Miranda' or 'Scotia'
 
 # Assign run parameters based on reach name
 if reach_name == 'Leggett': 
@@ -96,4 +96,4 @@ print('Dwdh calc done!!')
 
 # output = plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval, topo_bankfull_transects_df, plot_ylim=None)
 # output = plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull)
-output = plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull, bankfull_width, plot_ylim=None)
+output = plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull, bankfull_width, plot_ylim)

@@ -140,25 +140,25 @@ def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankful
     norm = Normalize(vmin=0, vmax=len(all_widths_df)-1)
     # Plot all widths spaghetti style
     fig, ax = plt.subplots()
-    plt.xlabel('Distance from 0-elevation (m)')
-    plt.ylabel('Channel width (m)')
+    plt.ylabel('Distance from 0-elevation (m)')
+    plt.xlabel('Channel width (m)')
     plt.title('Incremental channel top widths for {}'.format(reach_name))
     # try: 
     #     plt.xlim(plot_ylim)
     # except:
     #     print('No ylim provided')
-    plt.xlim([220, 270])
+    plt.ylim(plot_ylim)
     for index, row in all_widths_df.iterrows():
         x_len = round(len(row[0]) * d_interval, 4)
         x_vals = np.arange(0, x_len, d_interval)
-        plt.plot(x_vals, row[0], alpha=0.3, color=cmap(norm(index)), linewidth=0.75)
-    plt.axhline(bankfull_width, label='Median width at modeled bankfull'.format(str(median_bankfull)), color='black', linewidth=0.75)
+        plt.plot(row[0], x_vals, alpha=0.3, color=cmap(norm(index)), linewidth=0.75) # Try plot with axes flipped
+    plt.axvline(bankfull_width, label='Median width at modeled bankfull'.format(str(median_bankfull)), color='black', linewidth=0.75)
     sm = ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])  # Set array to avoid warnings
     cbar = plt.colorbar(sm, ax=ax)
     plt.legend()
     cbar.set_label("Downstream distance (m)")
-    plt.savefig('data/data_outputs/{}/all_widths.jpeg'.format(reach_name), dpi=400)
+    plt.savefig('data/data_outputs/{}/all_widths_flipped.jpeg'.format(reach_name), dpi=400)
     plt.close()
     breakpoint()
 
