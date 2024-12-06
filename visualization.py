@@ -73,16 +73,18 @@ def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plo
         ax3 = plt.subplot2grid((2,2), (1,1)) # bottom-right panel
         # breakpoint()
         ax1.plot(stations_plot_df['station_y'], stations_plot_df['station_z'], color='black', linestyle='-', label='Transect')
-        ax1.plot(bankfull_plot_df['bankfull_y'], bankfull_plot_df['bankfull_z'],color='red', linestyle='-', label='Bankfull')
+        # ax1.plot(bankfull_plot_df['bankfull_y'], bankfull_plot_df['bankfull_z'],color='red', linestyle='-', label='Model-derived bankfull')
+        # ax1.axhline(current_topo_bankfull, color='grey', linestyle='dashed', label='Topo-derived bankfull')
+        # ax1.axhline(bankfull_z_plot_avg, color='red', linestyle='-', label='Model-derived bankfull')
         # Create empty plotline with blank marker containing bankfull label
-        bankfull_label = str(round(bankfull_z_plot_avg, 2))
-        ax1.plot([], [], ' ', label="Bankfull elev={}m".format(bankfull_label))
+        # bankfull_label = str(round(bankfull_z_plot_avg, 2))
+        # ax1.plot([], [], ' ', label="Bankfull elev={}m".format(bankfull_label))
         try: 
             ax2.set_ylim(plot_ylim)
             ax3.set_ylim(plot_ylim)
         except:
             print('No xlim provided')     
-        ax1.axhline(current_topo_bankfull, color='grey', linestyle='dashed', label='topo-derived bankfull')
+        # ax1.axhline(current_topo_bankfull, color='grey', linestyle='dashed', label='topo-derived bankfull')
         ax1.set_xlabel('Meters')
         ax1.set_ylabel('Elevation (meters)')
         ax1.set_title('Eel River at {}'.format(reach_name))
@@ -110,6 +112,14 @@ def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plo
     return()
 
 def plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull):
+    # Calc bankfull ranges for plotting
+    modeled_bf = modeled_bankfull_transects_df['bankfull_ams']
+    topo_bf = topo_bankfull_transects_df['bankfull']
+    modeled_25 = np.nanpercentile(modeled_bf, 25)
+    modeled_75 = np.nanpercentile(modeled_bf, 75)
+    topo_25 = np.nanpercentile(topo_bf, 25)
+    topo_75 = np.nanpercentile(topo_bf, 75)
+    
     # Plot bankfull results along logitudinal profile
     modeled_bankfull_transects = modeled_bankfull_transects_df['bankfull_ams']
     modeled_bankfull_transects = [np.nan if x < 0 else x for x in modeled_bankfull_transects]
@@ -128,8 +138,10 @@ def plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, topo_bankful
     plt.title('Logitudinal profile of bankfull elevations, {}'.format(reach_name))
     plt.plot(x_vals, bankfull_results, label='topo-derived bankfull')
     plt.plot(x_vals, modeled_bankfull_transects, color='green', label='model-derived bankfull')
-    plt.axhline(median_bankfull, linestyle='dashed', color='black', label='modeled median bankfull') 
-    plt.axhline(median_topo_bankfull, linestyle='dashed', color='grey', label='topographic median bankfull')
+    plt.axhline(modeled_25, linestyle='dashed', color='black', label='Benchmark bankfull 25%-75%') 
+    plt.axhline(modeled_75, linestyle='dashed', color='black') 
+    plt.axhline(topo_25, linestyle='dashed', color='grey', label='Topographic bankfull 25%-75%')
+    plt.axhline(topo_75, linestyle='dashed', color='grey')
     plt.legend(loc='upper right')
     plt.savefig('data/data_outputs/{}/Bankfull_longitudinals'.format(reach_name))
     plt.close()
