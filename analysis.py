@@ -29,6 +29,7 @@ def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval, median_bank
     # df to store arrays of w and h
     all_widths_df = pd.DataFrame(columns=['widths'])
     bankfull_width_ls = [] # using modeled bankfull, track channel width at bankfull for each transect
+    thalweg_ls = []
     incomplete_intersection_counter = 0
     total_measurements = 0
     # for transect in transects:
@@ -127,6 +128,7 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
     upper = np.nanmedian(upper_ls)
 
     bankfull_results = []
+    bankfull_width = []
     for x_index, xsection in enumerate(all_widths_df['widths']): # loop through all x-sections
         dw = []
         ddw = []
@@ -152,6 +154,7 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
         max_ddw_index = ddw_abs.index(max_ddw)
         bankfull_id_elevation = d_interval * max_ddw_index # sea-level elevation corresponding with bankfull
         bankfull_results.append(bankfull_id_elevation)
+        bankfull_width.append(xsection[max_ddw_index])
         # Output dw/ddw spacing, which is in 1/10 meter increments
         dw_xvals = get_x_vals(dw, d_interval)
         ddw_xvals = get_x_vals(ddw, d_interval)
@@ -159,7 +162,7 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
         ddw_df = pd.DataFrame({'elevation_m':ddw_xvals, 'ddw':ddw})
         dw_df.to_csv('data/data_outputs/{}/first_order_roc/first_order_roc_{}.csv'.format(reach_name, x_index))
         ddw_df.to_csv('data/data_outputs/{}/second_order_roc/second_order_roc_{}.csv'.format(reach_name, x_index))
-
+    print('black creek bankfull with is {} m'.format(np.nanmean(bankfull_width)))
     # save topo-derived bankfull for each transect
     bankfull_results_dt = pd.DataFrame({'bankfull':bankfull_results})
     bankfull_results_dt.to_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
@@ -193,6 +196,7 @@ def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df):
     max_neg_ddw = np.nanmin(ddw[lower_bound_index:upper_bound_index])
     max_neg_ddw_index = ddw.index(max_neg_ddw)
     bankfull_id_elevation = d_interval * max_ddw_index # sea-level elevation corresponding with bankfull
+    breakpoint()
     # figure this out with a plot...
     # avg_width = avg_width[:400] # chop off noisy end of data
     import matplotlib.pyplot as plt

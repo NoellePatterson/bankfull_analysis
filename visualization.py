@@ -74,8 +74,8 @@ def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plo
         # breakpoint()
         ax1.plot(stations_plot_df['station_y'], stations_plot_df['station_z'], color='black', linestyle='-', label='Transect')
         # ax1.plot(bankfull_plot_df['bankfull_y'], bankfull_plot_df['bankfull_z'],color='red', linestyle='-', label='Model-derived bankfull')
-        # ax1.axhline(current_topo_bankfull, color='grey', linestyle='dashed', label='Topo-derived bankfull')
-        # ax1.axhline(bankfull_z_plot_avg, color='red', linestyle='-', label='Model-derived bankfull')
+        ax1.axhline(current_topo_bankfull, color='grey', linestyle='dashed', label='Topo-derived bankfull')
+        ax1.axhline(bankfull_z_plot_avg, color='red', linestyle='-', label='Benchmark bankfull')
         # Create empty plotline with blank marker containing bankfull label
         # bankfull_label = str(round(bankfull_z_plot_avg, 2))
         # ax1.plot([], [], ' ', label="Bankfull elev={}m".format(bankfull_label))
@@ -90,7 +90,7 @@ def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plo
         ax1.set_title('Eel River at {}'.format(reach_name))
         ax1.legend()
         ax2.plot(current_widths, width_xvals, label='first order rate of change')
-        ax2.axhline(bankfull_plot_df['bankfull_z'][0], color='red', label='model-derived bankfull', alpha=0.5)
+        ax2.axhline(bankfull_plot_df['bankfull_z'][0], color='red', label='benchmark bankfull', alpha=0.5)
         ax2.axhline(current_topo_bankfull, color='grey', linestyle='dashed', label='topo-derived bankfull', alpha=0.5)
         ax2.set_ylabel('Elevation (meters)')
         ax25 = ax2.twiny()
@@ -98,7 +98,7 @@ def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plo
         ax2.set_title('Cross-section and first-order rate of change')
         ax3.plot(ddw, ddw_xvals)
         ax3.set_ylabel('Elevation (meters)')
-        ax3.axhline(bankfull_plot_df['bankfull_z'][0], color='red', label='model-derived bankfull')
+        ax3.axhline(bankfull_plot_df['bankfull_z'][0], color='red', label='benchmark bankfull')
         ax3.axhline(current_topo_bankfull, color='grey', linestyle='dashed', label='topo-derived bankfull')
         ax35 = ax3.twiny()
         ax35.plot(stations_plot_df['station_y'], stations_plot_df['station_z'], color='grey', linestyle='-', label='Transect')
@@ -136,8 +136,8 @@ def plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, topo_bankful
     plt.xlabel('Transects from upstream to downstream (m)')
     plt.ylabel('Bankfull elevation ASL (m)')
     plt.title('Logitudinal profile of bankfull elevations, {}'.format(reach_name))
-    plt.plot(x_vals, bankfull_results, label='topo-derived bankfull')
-    plt.plot(x_vals, modeled_bankfull_transects, color='green', label='model-derived bankfull')
+    plt.plot(x_vals, bankfull_results, label='Topographic bankfull')
+    plt.plot(x_vals, modeled_bankfull_transects, color='green', label='Benchmark bankfull')
     plt.axhline(modeled_25, linestyle='dashed', color='black', label='Benchmark bankfull 25%-75%') 
     plt.axhline(modeled_75, linestyle='dashed', color='black') 
     plt.axhline(topo_25, linestyle='dashed', color='grey', label='Topographic bankfull 25%-75%')
@@ -146,38 +146,44 @@ def plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, topo_bankful
     plt.savefig('data/data_outputs/{}/Bankfull_longitudinals'.format(reach_name))
     plt.close()
 
-def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull, bankfull_width, plot_ylim):
+def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, modeled_bankfull_transects_df, median_bankfull, median_topo_bankfull, bankfull_width, plot_ylim):
     # Create color ramp 
     cmap = plt.cm.viridis
     norm = Normalize(vmin=0, vmax=len(all_widths_df)-1)
     # Plot all widths spaghetti style
     fig, ax = plt.subplots()
-    plt.ylabel('Distance from 0-elevation (m)')
-    plt.xlabel('Channel width (m)')
+    plt.ylabel('Channel width (m)')
+    plt.xlabel('Height above sea level (m)')
     plt.title('Incremental channel top widths for {}'.format(reach_name))
     # try: 
     #     plt.xlim(plot_ylim)
     # except:
     #     print('No ylim provided')
-    plt.ylim(plot_ylim)
+    # plt.ylim(plot_ylim)
+    plt.xlim((220,270))
     for index, row in all_widths_df.iterrows():
         x_len = round(len(row[0]) * d_interval, 4)
         x_vals = np.arange(0, x_len, d_interval)
-        plt.plot(row[0], x_vals, alpha=0.3, color=cmap(norm(index)), linewidth=0.75) # Try plot with axes flipped
-    plt.axvline(bankfull_width, label='Median width at modeled bankfull'.format(str(median_bankfull)), color='black', linewidth=0.75)
+        plt.plot(x_vals, row[0], alpha=0.3, color=cmap(norm(index)), linewidth=0.75) # Try plot with axes flipped
+    # plt.axvline(bankfull_width, label='Median width at modeled bankfull'.format(str(median_bankfull)), color='black', linewidth=0.75)
     sm = ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])  # Set array to avoid warnings
     cbar = plt.colorbar(sm, ax=ax)
-    plt.legend()
     cbar.set_label("Downstream distance (m)")
-    plt.savefig('data/data_outputs/{}/all_widths_flipped.jpeg'.format(reach_name), dpi=400)
+    plt.savefig('data/data_outputs/{}/all_widths.jpeg'.format(reach_name), dpi=400)
     plt.close()
-    breakpoint()
 
     # Plot average and bounds on all widths
     # calc element-wise avg, 25th, & 75th percentile of each width increment
+    modeled_bf = modeled_bankfull_transects_df['bankfull_ams']
+    topo_bf = topo_bankfull_transects_df['bankfull']
+    modeled_25 = np.nanpercentile(modeled_bf, 25)
+    modeled_75 = np.nanpercentile(modeled_bf, 75)
+    topo_25 = np.nanpercentile(topo_bf, 25)
+    topo_75 = np.nanpercentile(topo_bf, 75)
+
     fig, ax = plt.subplots()
-    plt.xlabel('Distance from 0-elevation (m)')
+    plt.xlabel('Height above sea level (m)')
     plt.ylabel('Channel width (m)')
     plt.title('Median incremental channel top widths for {}'.format(reach_name))
     max_len = max(all_widths_df['widths'].apply(len)) # find the longest row in df
@@ -197,9 +203,11 @@ def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankful
     plt.plot(x_vals, transect_50, color='black')
     plt.plot(x_vals, transect_25, color='blue')
     plt.plot(x_vals, transect_75, color='blue')
-    plt.axvline(median_bankfull, label='median modeled bankfull', color='black', linestyle='dashed')
-    plt.axvline(median_topo_bankfull, label='median topo bankfull', color='grey', linestyle='dashed')
+    plt.axvline(modeled_25, linestyle='dashed', color='black', label='Benchmark bankfull 25%-75%') 
+    plt.axvline(modeled_75, linestyle='dashed', color='black') 
+    plt.axvline(topo_25, linestyle='dashed', color='grey')
+    plt.axvline(topo_75, linestyle='dashed', color='grey', label='Topographic bankfull 25%-75%')
     plt.legend()
-    # plt.savefig('data/data_outputs/{}/median_widths.jpeg'.format(reach_name), dpi=400)
+    plt.savefig('data/data_outputs/{}/median_widths.jpeg'.format(reach_name), dpi=400)
 
 

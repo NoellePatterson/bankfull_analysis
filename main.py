@@ -33,7 +33,7 @@ if reach_name == 'Leggett':
     topo_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
     median_bankfull = np.nanmedian(modeled_bankfull_transects_df['bankfull_ams']) # model-derived reach-averaged bankfull
     median_topo_bankfull = np.nanmedian(topo_bankfull_transects_df['bankfull']) # topography-derived reach-averaged bankfull
-    plot_ylim = [220, 270]
+    plot_ylim = [220, 250]
 
 elif reach_name == 'Miranda':
     transect_fp = 'GIS/data_inputs/Miranda/XS_Sections/Thalweg_10m_adjusted.shp'
@@ -88,12 +88,12 @@ plot_interval = 1 # set plotting interval along transect in units of meters
 d_interval = 10/100 # Set intervals to step up in depth (in units meters). 10cm intervals
 
 # Uncomment functions to run
-# all_widths_df, bankfull_width = calc_dwdh(reach_name, transects, dem, plot_interval, d_interval, median_bankfull)
+all_widths_df, bankfull_width = calc_dwdh(reach_name, transects, dem, plot_interval, d_interval, median_bankfull)
 print('Dwdh calc done!!')
-# output = calc_derivatives(reach_name, d_interval, all_widths_df)
+output = calc_derivatives(reach_name, d_interval, all_widths_df)
 # print('Derivatives calc done!!')
 # output = calc_derivatives_aggregate(reach_name, d_interval, all_widths_df)
 
-# output = plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval, topo_bankfull_transects_df, plot_ylim)
+output = plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval, topo_bankfull_transects_df, plot_ylim)
 output = plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull)
-# output = plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull, bankfull_width, plot_ylim)
+output = plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, modeled_bankfull_transects_df, median_bankfull, median_topo_bankfull, bankfull_width, plot_ylim)
