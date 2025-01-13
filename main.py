@@ -17,9 +17,11 @@ from shapely.geometry import Point, shape, MultiPoint
 from shapely.geometry.point import Point
 import numpy as np
 from matplotlib import pyplot as plt
+import dataretrieval.nwis as nwis
+from datetime import datetime
 import sys
 import pdb
-from analysis import calc_dwdh, calc_derivatives, calc_derivatives_aggregate
+from analysis import calc_dwdh, calc_derivatives, calc_derivatives_aggregate, recurrence_interval
 from visualization import plot_bankfull, plot_bankfull_increments, plot_longitudinal_bf
 
 reach_name = 'Leggett' # Choose 'Leggett' or 'Miranda' or 'Scotia'
@@ -33,6 +35,7 @@ if reach_name == 'Leggett':
     topo_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
     median_bankfull = np.nanmedian(modeled_bankfull_transects_df['bankfull_ams']) # model-derived reach-averaged bankfull
     median_topo_bankfull = np.nanmedian(topo_bankfull_transects_df['bankfull']) # topography-derived reach-averaged bankfull
+    flow_record = nwis.get_record(sites='11475800', service='dv', start='1900-01-01', end=datetime.today().strftime('%Y-%m-%d'))
     plot_ylim = [220, 250]
 
 elif reach_name == 'Miranda':
@@ -43,6 +46,7 @@ elif reach_name == 'Miranda':
     topo_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
     median_bankfull = np.nanmedian(modeled_bankfull_transects_df['bankfull_ams']) # model-derived reach-averaged bankfull
     median_topo_bankfull = np.nanmedian(topo_bankfull_transects_df['bankfull']) # topography-derived reach-averaged bankfull
+    flow_record = nwis.get_record(sites='11476500', service='dv', start='1900-01-01', end=datetime.today().strftime('%Y-%m-%d'))
     plot_ylim = [60, 100]
 
 elif reach_name == 'Scotia':
@@ -53,6 +57,7 @@ elif reach_name == 'Scotia':
     topo_bankfull_transects_df = pd.read_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
     median_bankfull = np.nanmedian(modeled_bankfull_transects_df['bankfull_ams']) # model-derived reach-averaged bankfull
     median_topo_bankfull = np.nanmedian(topo_bankfull_transects_df['bankfull']) # topography-derived reach-averaged bankfull
+    flow_record = nwis.get_record(sites='11477000', service='dv', start='1900-01-01', end=datetime.today().strftime('%Y-%m-%d'))
     plot_ylim = [10, 42]
 
 else:
@@ -90,10 +95,11 @@ d_interval = 10/100 # Set intervals to step up in depth (in units meters). 10cm 
 # Uncomment functions to run
 all_widths_df, bankfull_width = calc_dwdh(reach_name, transects, dem, plot_interval, d_interval, median_bankfull)
 print('Dwdh calc done!!')
-output = calc_derivatives(reach_name, d_interval, all_widths_df)
+bankfull_results, bankfull_results_detrend = calc_derivatives(reach_name, d_interval, all_widths_df)
 # print('Derivatives calc done!!')
 # output = calc_derivatives_aggregate(reach_name, d_interval, all_widths_df)
+# output = recurrence_interval(flow_record, bankfull_results)
 
-output = plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval, topo_bankfull_transects_df, plot_ylim)
-output = plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull)
+# output = plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval, bankfull_results, plot_ylim)
+output = plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, bankfull_results_detrend, median_bankfull, median_topo_bankfull)
 output = plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, modeled_bankfull_transects_df, median_bankfull, median_topo_bankfull, bankfull_width, plot_ylim)

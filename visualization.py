@@ -1,13 +1,15 @@
 import geopandas as gpd
 import pandas as pd
 import numpy as np
+import pdb
 from shapely.geometry import Point, shape, MultiPoint
 from shapely.geometry.point import Point
+from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 
-def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval, topo_bankfull_transects_df, plot_ylim=None):
+def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval, bankfull_results, plot_ylim=None):
     d_interval = 10/100 # units meters
     # For each transect, find intersection points with bankfull, and plot transects with intersections
     bankfull = []
@@ -60,7 +62,7 @@ def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plo
         current_widths = current_widths['widths']
         width_xvals = get_x_vals(current_widths)
         # Bring in topo bankfull data
-        current_topo_bankfull = topo_bankfull_transects_df['bankfull'][index]
+        current_topo_bankfull = bankfull_results[index]
         # Bring in rate of change data
         dw = pd.read_csv('data/data_outputs/{}/first_order_roc/first_order_roc_{}.csv'.format(reach_name, index))
         dw_xvals = get_x_vals(dw)
@@ -111,40 +113,50 @@ def plot_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plo
 
     return()
 
-def plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, topo_bankfull_transects_df, median_bankfull, median_topo_bankfull):
+def plot_longitudinal_bf(reach_name, modeled_bankfull_transects_df, bankfull_topo_detrend, median_bankfull, median_topo_bankfull):
+    # Detrend benchmark bankfull results for plotting
+    bankfull_benchmark = modeled_bankfull_transects_df['bankfull_ams']
+    x = np.array(modeled_bankfull_transects_df['Unnamed: 0']).reshape(-1, 1)
+    y = np.array(bankfull_benchmark)
+    model = LinearRegression().fit(x, y)
+    slope = model.coef_
+    intercept = model.intercept_
+    fit_slope =  slope*x
+    fit_slope = [val[0] for val in fit_slope]
+    # pairwise subtract fit from bankfull results
+    bankfull_benchmark_detrend = []
+    for index, val in enumerate(bankfull_benchmark):
+        bankfull_benchmark_detrend.append(val - fit_slope[index])
+
     # Calc bankfull ranges for plotting
-    modeled_bf = modeled_bankfull_transects_df['bankfull_ams']
-    topo_bf = topo_bankfull_transects_df['bankfull']
-    modeled_25 = np.nanpercentile(modeled_bf, 25)
-    modeled_75 = np.nanpercentile(modeled_bf, 75)
-    topo_25 = np.nanpercentile(topo_bf, 25)
-    topo_75 = np.nanpercentile(topo_bf, 75)
+    benchmark_25 = np.nanpercentile(bankfull_benchmark_detrend, 25)
+    benchmark_75 = np.nanpercentile(bankfull_benchmark_detrend, 75)
+    topo_25 = np.nanpercentile(bankfull_topo_detrend, 25)
+    topo_75 = np.nanpercentile(bankfull_topo_detrend, 75)
     
     # Plot bankfull results along logitudinal profile
-    modeled_bankfull_transects = modeled_bankfull_transects_df['bankfull_ams']
-    modeled_bankfull_transects = [np.nan if x < 0 else x for x in modeled_bankfull_transects]
-    bankfull_results = topo_bankfull_transects_df['bankfull']
     if reach_name == 'Leggett' or reach_name == 'Miranda':
         transect_spacing = 10 # units meters
     elif reach_name == 'Scotia':
-        bankfull_results = bankfull_results[:-1] # remove erroneous final value
-        modeled_bankfull_transects = modeled_bankfull_transects[:-1]
+        bankfull_topo_detrend = bankfull_topo_detrend[:-1] # remove erroneous final value
+        bankfull_benchmark_detrend = bankfull_benchmark_detrend[:-1]
         transect_spacing = 15 # units meters
-    x_len = len(bankfull_results)
+    x_len = len(bankfull_topo_detrend)
     x_vals = np.arange(0, (x_len * transect_spacing), transect_spacing)
     fig, ax = plt.subplots()
     plt.xlabel('Transects from upstream to downstream (m)')
     plt.ylabel('Bankfull elevation ASL (m)')
     plt.title('Logitudinal profile of bankfull elevations, {}'.format(reach_name))
-    plt.plot(x_vals, bankfull_results, label='Topographic bankfull')
-    plt.plot(x_vals, modeled_bankfull_transects, color='green', label='Benchmark bankfull')
-    plt.axhline(modeled_25, linestyle='dashed', color='black', label='Benchmark bankfull 25%-75%') 
-    plt.axhline(modeled_75, linestyle='dashed', color='black') 
+    plt.plot(x_vals, bankfull_topo_detrend, label='Topographic bankfull')
+    plt.plot(x_vals, bankfull_benchmark_detrend, color='green', label='Benchmark bankfull')
+    plt.axhline(benchmark_25, linestyle='dashed', color='black', label='Benchmark bankfull 25%-75%') 
+    plt.axhline(benchmark_75, linestyle='dashed', color='black') 
     plt.axhline(topo_25, linestyle='dashed', color='grey', label='Topographic bankfull 25%-75%')
     plt.axhline(topo_75, linestyle='dashed', color='grey')
     plt.legend(loc='upper right')
     plt.savefig('data/data_outputs/{}/Bankfull_longitudinals'.format(reach_name))
     plt.close()
+    pdb.set_trace()
 
 def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankfull_transects_df, modeled_bankfull_transects_df, median_bankfull, median_topo_bankfull, bankfull_width, plot_ylim):
     # Create color ramp 
@@ -161,7 +173,7 @@ def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankful
     #     print('No ylim provided')
     # plt.ylim(plot_ylim)
     plt.xlim((220,270))
-    for index, row in all_widths_df.iterrows():
+    for index, row in all_widths_df.iterrows(): 
         x_len = round(len(row[0]) * d_interval, 4)
         x_vals = np.arange(0, x_len, d_interval)
         plt.plot(x_vals, row[0], alpha=0.3, color=cmap(norm(index)), linewidth=0.75) # Try plot with axes flipped
@@ -172,6 +184,19 @@ def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankful
     cbar.set_label("Downstream distance (m)")
     plt.savefig('data/data_outputs/{}/all_widths.jpeg'.format(reach_name), dpi=400)
     plt.close()
+
+    # Calculate cross section area based on discrete width increments
+    all_widths_df['areas'] = None
+    all_widths_df['areas'] = all_widths_df['areas'].astype('object')
+    for index, row in all_widths_df.iterrows():
+        widths = row['widths']
+        areas = []
+        cum_area = 0
+        for width in widths:
+            new_width = width * d_interval/100 # keep area in m^2
+            cum_area += new_width
+            areas.append(cum_area)
+        all_widths_df.at[index, 'areas'] = list(areas)
 
     # Plot average and bounds on all widths
     # calc element-wise avg, 25th, & 75th percentile of each width increment
@@ -186,12 +211,20 @@ def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankful
     plt.xlabel('Height above sea level (m)')
     plt.ylabel('Channel width (m)')
     plt.title('Median incremental channel top widths for {}'.format(reach_name))
+    # Prepare widths for plotting
     max_len = max(all_widths_df['widths'].apply(len)) # find the longest row in df
     all_widths_df['widths_padded'] = all_widths_df['widths'].apply(lambda x: np.pad(x, (0, max_len - len(x)), constant_values=np.nan)) # pad all shorter rows with nan
     padded_df = pd.DataFrame(all_widths_df['widths_padded'].tolist())
     transect_50 = padded_df.apply(lambda row: np.nanpercentile(row, 50), axis=0)
     transect_25 = padded_df.apply(lambda row: np.nanpercentile(row, 25), axis=0)
     transect_75 = padded_df.apply(lambda row: np.nanpercentile(row, 75), axis=0)
+    # prepare areas for plotting on secondary y axis
+    max_len = max(all_widths_df['areas'].apply(len)) # find the longest area row in df
+    all_widths_df['areas_padded'] = all_widths_df['areas'].apply(lambda x: np.pad(x, (0, max_len - len(x)), constant_values=np.nan)) # pad all shorter rows with nan
+    padded_df_areas = pd.DataFrame(all_widths_df['areas_padded'].tolist())
+    transect_50_area = padded_df_areas.apply(lambda row: np.nanpercentile(row, 50), axis=0)
+    transect_25_area = padded_df_areas.apply(lambda row: np.nanpercentile(row, 25), axis=0)
+    transect_75_area = padded_df_areas.apply(lambda row: np.nanpercentile(row, 75), axis=0)
     x_len = round(len(transect_50) * d_interval, 4)
     x_vals = np.arange(0, x_len, d_interval)
     if reach_name == 'Scotia':
@@ -201,13 +234,23 @@ def plot_bankfull_increments(reach_name, all_widths_df, d_interval, topo_bankful
     if reach_name == 'Leggett':
         plt.xlim(plot_ylim)
     plt.plot(x_vals, transect_50, color='black')
-    plt.plot(x_vals, transect_25, color='blue')
+    plt.plot(x_vals, transect_25, color='blue', label='channel width')
     plt.plot(x_vals, transect_75, color='blue')
+    plt.legend(loc='center right')
+    # plot area on a secondary axis
+    ax2 = ax.twinx()
+    ax2.set_ylabel('Channel area ($m^2$)')
+    ax2.set_ylim(0,30)
+    ax2.plot(x_vals, transect_50_area, color='black')
+    ax2.plot(x_vals, transect_25_area, color='green', label='channel area')
+    ax2.plot(x_vals, transect_75_area, color='green')
+
     plt.axvline(modeled_25, linestyle='dashed', color='black', label='Benchmark bankfull 25%-75%') 
     plt.axvline(modeled_75, linestyle='dashed', color='black') 
     plt.axvline(topo_25, linestyle='dashed', color='grey')
     plt.axvline(topo_75, linestyle='dashed', color='grey', label='Topographic bankfull 25%-75%')
     plt.legend()
     plt.savefig('data/data_outputs/{}/median_widths.jpeg'.format(reach_name), dpi=400)
+    pdb.set_trace()
 
 

@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import geopandas as gpd
 from scipy.stats import linregress
+from sklearn.linear_model import LinearRegression
+import pdb
 
 def get_x_vals(y_vals, d_interval):
         x_len = round(len(y_vals) * d_interval, 4)
@@ -29,7 +31,6 @@ def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval, median_bank
     # df to store arrays of w and h
     all_widths_df = pd.DataFrame(columns=['widths'])
     bankfull_width_ls = [] # using modeled bankfull, track channel width at bankfull for each transect
-    thalweg_ls = []
     incomplete_intersection_counter = 0
     total_measurements = 0
     # for transect in transects:
@@ -49,7 +50,6 @@ def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval, median_bank
         # normalized_elevs = elevs - min_elevation
 
         # Strategy 2: Base all depths on 0-elevation
-        min_elevation = 0
         normalized_elevs = elevs
 
         # Determine total depth of iterations based on max rise on the lower bank
@@ -95,14 +95,15 @@ def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval, median_bank
                 width = np.nan
                 incomplete_intersection_counter += 1 
             wh_ls.append(width)
+
             depth_0elev = round(d_interval * depth, 1)
             bankfull = round(median_bankfull, 1)
             if depth_0elev == bankfull:
                 bankfull_width_ls.append(width)
-        
+        thalweg = min(elevs) # track this for use later in detrending
         wh_ls_df = pd.DataFrame({'widths':wh_ls})
         wh_ls_df.to_csv('data/data_outputs/{}/all_widths/widths_{}.csv'.format(reach_name, transects_index))
-        wh_append = pd.DataFrame({'widths':[wh_ls], 'transect_id':transects_index})
+        wh_append = pd.DataFrame({'widths':[wh_ls], 'transect_id':transects_index, 'thalweg_elev':thalweg})
         all_widths_df = pd.concat([all_widths_df, wh_append], ignore_index=True)
     bankfull_width = np.nanmedian(bankfull_width_ls)
     return(all_widths_df, bankfull_width)
@@ -162,10 +163,28 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
         ddw_df = pd.DataFrame({'elevation_m':ddw_xvals, 'ddw':ddw})
         dw_df.to_csv('data/data_outputs/{}/first_order_roc/first_order_roc_{}.csv'.format(reach_name, x_index))
         ddw_df.to_csv('data/data_outputs/{}/second_order_roc/second_order_roc_{}.csv'.format(reach_name, x_index))
+    
+    # Use thalweg elevs to detrend bankfull elevation results. Don't remove intercept (keep at elevation) 
+    x = np.array(all_widths_df['transect_id']).reshape((-1, 1))
+    y = np.array(all_widths_df['thalweg_elev'])
+    model = LinearRegression().fit(x, y)
+    slope = model.coef_
+    intercept = model.intercept_
+    fit_slope = slope*x
+    fit_slope = [val[0] for val in fit_slope]
+    # pairwise subtract fit from bankfull results
+    bankfull_results_detrend = []
+    for index, val in enumerate(bankfull_results):
+        bankfull_results_detrend.append(val - fit_slope[index])
+
     print('black creek bankfull with is {} m'.format(np.nanmean(bankfull_width)))
     # save topo-derived bankfull for each transect
+    detrend_bankfull_results_dt = pd.DataFrame({'bankfull':bankfull_results_detrend})
+    detrend_bankfull_results_dt.to_csv('data/data_outputs/{}/transect_bankfull_topo_detrended.csv'.format(reach_name))
     bankfull_results_dt = pd.DataFrame({'bankfull':bankfull_results})
     bankfull_results_dt.to_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
+
+    return(bankfull_results, bankfull_results_detrend)
 
 def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df):
     # average all xsection widths element-wise
@@ -226,3 +245,17 @@ def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df):
 
     # there it is! 
     breakpoint()
+
+def recurrence_interval():
+    # Calculate recurrence interval of flow at bankfull stage along profile
+
+    # Bring in topo bankfull results (not detrended)
+
+    # Bring in flow-stage data (rating curve)
+    # Calculate flow-recurrence intervals
+    # For each bankfull result:
+    # 1. Find corresponding flow
+    # 2. Find correcsponding recurrence interval as years (i.e. 2-yr flow)
+
+    # Visualize: plot recurrence intervals along profile
+    pdb.set_trace()
