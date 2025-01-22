@@ -85,15 +85,16 @@ bankfull_boundary = gpd.GeoDataFrame({'geometry':[bankfull_boundary]}, crs=bankf
 
 plot_interval = 1 # set plotting interval along transect in units of meters
 d_interval = 10/100 # Set intervals to step up in depth (in units meters). 10cm intervals
+slope_window = 5 # Set window size for calculating slope for derivatives
 
 # Uncomment functions to run
 
-# output = id_benchmark_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval)
-# all_widths_df, bankfull_width = calc_dwdh(reach_name, transects, dem, plot_interval, d_interval)
-# print('Dwdh calc done!!')
-# topo_bankfull, topo_bankfull_detrend = calc_derivatives(reach_name, d_interval, all_widths_df)
-# print('Derivatives calc done!!')
-# output = calc_derivatives_aggregate(reach_name, d_interval, all_widths_df)
+output = id_benchmark_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval)
+all_widths_df, bankfull_width = calc_dwdh(reach_name, transects, dem, plot_interval, d_interval)
+print('Dwdh calc done!!')
+topo_bankfull, topo_bankfull_detrend = calc_derivatives(reach_name, d_interval, all_widths_df, slope_window)
+print('Derivatives calc done!!')
+output = calc_derivatives_aggregate(reach_name, d_interval, all_widths_df, slope_window)
 # output = recurrence_interval(flow_record, bankfull_results)
 
 # Plotting functions

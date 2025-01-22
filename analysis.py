@@ -162,7 +162,7 @@ def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval):
     all_widths_df.to_csv('data/data_outputs/{}/all_widths.csv'.format(reach_name))
     return(all_widths_df, bankfull_width)
 
-def calc_derivatives(reach_name, d_interval, all_widths_df):
+def calc_derivatives(reach_name, d_interval, all_widths_df, slope_window):
     # calculate and plot second derivative of width (height is constant)
     # Calc upper and lower bounds widths
     lower_ls = []
@@ -188,10 +188,10 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
         dw = []
         ddw = []
         xs_xvals = get_x_vals(xsection, d_interval)
-        dw = multipoint_slope(5, xsection, xs_xvals)
-        ddw = multipoint_slope(5, dw, xs_xvals)
+        dw = multipoint_slope(slope_window, xsection, xs_xvals)
+        ddw = multipoint_slope(slope_window, dw, xs_xvals)
 
-        # Find max second derivative as bankfull. turn this into a function... 
+        # Find max second derivative as bankfull. 
         ddw_abs = [abs(i) for i in ddw]
         # Add in upper and lower search bounds on max 2nd deriv bankfull ID
         lower_bound_index = find_boundary(xsection, lower)
@@ -230,7 +230,7 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
 
     return(topo_bankfull, topo_bankfull_detrend)
 
-def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df):
+def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df, slope_window):
     lower_ls = []
     upper_ls = []
     # Determine upper and lower bounds for bankfull ID
@@ -258,8 +258,8 @@ def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df):
         for elements in zip(*all_widths_padded)
     ]
     xs_xvals = get_x_vals(avg_width, d_interval)
-    dw = multipoint_slope(5, avg_width, xs_xvals)
-    ddw = multipoint_slope(5, dw, xs_xvals)
+    dw = multipoint_slope(slope_window, avg_width, xs_xvals)
+    ddw = multipoint_slope(slope_window, dw, xs_xvals)
     lower_bound_index = find_boundary(avg_width, lower)
     upper_bound_index = find_boundary(avg_width, upper)
     # apply rolling avg derivative calcs
