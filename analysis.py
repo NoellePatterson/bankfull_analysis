@@ -1,7 +1,10 @@
 import pandas as pd
 import numpy as np
 import geopandas as gpd
+from shapely.geometry import Point, shape, MultiPoint
+from shapely.geometry.point import Point
 from scipy.stats import linregress
+import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 import pdb
 
@@ -26,13 +29,67 @@ def find_boundary(xsection, bound):
             break
     return bound_index
 
-def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval, median_bankfull):
+def id_benchmark_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval):
+    # For each transect, find intersection points with bankfull, and plot transects with intersections
+    bankfull_benchmark = []
+    for index, row in transects.iterrows():
+        line = gpd.GeoDataFrame({'geometry': [row['geometry']]}, crs=transects.crs)
+        intersect_pts = line.geometry.intersection(bankfull_boundary)
+
+        # Generate a spaced interval of stations along each transect for plotting
+        tot_len = line.length
+        distances = np.arange(0, tot_len[0], plot_interval) 
+        stations = row['geometry'].interpolate(distances) # specify stations in transect based on plotting interval
+        stations = gpd.GeoDataFrame(geometry=stations, crs=transects.crs)
+        # Extract z elevation at each station along transect
+        elevs = list(dem.sample([(point.x, point.y) for point in stations.geometry]))
+        
+        # Get Y and Z coordinates for bankfull intersections 
+        station_zero = stations['geometry'][0]
+        station_zero_gpf = gpd.GeoDataFrame({'geometry':[station_zero]}, crs=transects.crs)
+        station_zero_gpf = station_zero_gpf.set_geometry('geometry') # ensure geometry is set correctly
+        
+        if isinstance(intersect_pts.geometry[0], Point):
+            print('Only one intersection point identified; skipping to next cross section.')
+            continue
+        coords = [(point.x, point.y) for point in intersect_pts.geometry[0].geoms]
+        # Be aware, Scotia transects size exceeds limits for figures saved in one folder (no warning issued)
+        bankfull_z = list(dem.sample(coords))
+        bankfull_z_plot_avg = np.nanmean([bankfull_z[0][0], bankfull_z[1][0]]) # Use average value of bankfull to smooth out inconsistencies
+        bankfull_benchmark.append(bankfull_z_plot_avg)
+
+    # Detrend benchmark bankfull results
+    x_vals = get_x_vals(bankfull_benchmark, d_interval)
+    x = np.array(x_vals).reshape(-1, 1)
+    y = np.array(bankfull_benchmark)
+    model = LinearRegression().fit(x, y)
+    slope = model.coef_
+    intercept = model.intercept_
+    fit_slope =  slope*x
+    fit_slope = [val[0] for val in fit_slope]
+    # pairwise subtract fit from bankfull results
+    bankfull_benchmark_detrend = []
+    for index, val in enumerate(bankfull_benchmark):
+        bankfull_benchmark_detrend.append(val - fit_slope[index])
+       
+    benchmark_bankfull_df = pd.DataFrame({'benchmark_bankfull_ams':bankfull_benchmark})
+    benchmark_bankfull_df.to_csv('data/data_outputs/{}/bankfull_benchmark.csv'.format(reach_name))
+    benchmark_bankfull_detrend_df = pd.DataFrame({'benchmark_bankfull_ams_detrend':bankfull_benchmark_detrend})
+    benchmark_bankfull_detrend_df.to_csv('data/data_outputs/{}/bankfull_benchmark_detrend.csv'.format(reach_name))
+    return()
+
+def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval):
     # Loop through xsections and create dw/dh array for each xsection
     # df to store arrays of w and h
     all_widths_df = pd.DataFrame(columns=['widths'])
-    bankfull_width_ls = [] # using modeled bankfull, track channel width at bankfull for each transect
     incomplete_intersection_counter = 0
     total_measurements = 0
+
+    # Optionally: check width at benchmark bankfull for each transect, store in a separate list
+    bankfull_width_ls = [] # using benchmark bankfull, track channel width at bankfull for each transect
+    benchmark_bankfull_df = pd.read_csv('data/data_outputs/{}/bankfull_benchmark.csv'.format(reach_name))
+    median_benchmark_bankfull = np.nanmedian(benchmark_bankfull_df['benchmark_bankfull_ams'])
+
     # for transect in transects:
     for transects_index, transects_row in transects.iterrows():
         wh_ls = []
@@ -45,11 +102,7 @@ def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval, median_bank
         # Extract z elevation at each station along transect
         elevs = list(dem.sample([(point.x, point.y) for point in stations.geometry]))
 
-        # # Strategy 1: normalize depths to thalweg
-        # min_elevation = min(elevs)
-        # normalized_elevs = elevs - min_elevation
-
-        # Strategy 2: Base all depths on 0-elevation
+        # Base all depths on 0-elevation
         normalized_elevs = elevs
 
         # Determine total depth of iterations based on max rise on the lower bank
@@ -97,8 +150,8 @@ def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval, median_bank
             wh_ls.append(width)
 
             depth_0elev = round(d_interval * depth, 1)
-            bankfull = round(median_bankfull, 1)
-            if depth_0elev == bankfull:
+            bm_bankfull = round(median_benchmark_bankfull, 1)
+            if depth_0elev == bm_bankfull:
                 bankfull_width_ls.append(width)
         thalweg = min(elevs) # track this for use later in detrending
         wh_ls_df = pd.DataFrame({'widths':wh_ls})
@@ -106,6 +159,7 @@ def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval, median_bank
         wh_append = pd.DataFrame({'widths':[wh_ls], 'transect_id':transects_index, 'thalweg_elev':thalweg})
         all_widths_df = pd.concat([all_widths_df, wh_append], ignore_index=True)
     bankfull_width = np.nanmedian(bankfull_width_ls)
+    all_widths_df.to_csv('data/data_outputs/{}/all_widths.csv'.format(reach_name))
     return(all_widths_df, bankfull_width)
 
 def calc_derivatives(reach_name, d_interval, all_widths_df):
@@ -128,7 +182,7 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
     lower = np.nanmedian(lower_ls)
     upper = np.nanmedian(upper_ls)
 
-    bankfull_results = []
+    topo_bankfull = []
     bankfull_width = []
     for x_index, xsection in enumerate(all_widths_df['widths']): # loop through all x-sections
         dw = []
@@ -136,15 +190,6 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
         xs_xvals = get_x_vals(xsection, d_interval)
         dw = multipoint_slope(5, xsection, xs_xvals)
         ddw = multipoint_slope(5, dw, xs_xvals)
-        # Strategy #1: calc stepwise slopes (bench style?) 
-        # for w_index, current_width in enumerate(xsection): # loop through all widths in current xsection
-        #     if w_index < len(xsection) - 1: # can caluclate differences up to second to last index
-        #         current_d = (xsection[w_index + 1] - current_width)/d_interval
-        #         dw.append(current_d)
-        # for dw_index, current_dw in enumerate(dw): # loop through all first order rate changes to get second order change  (slope break)
-        #     if dw_index < len(dw) - 1: # can calculate differences up to second to last first-order change
-        #         current_dd = (dw[dw_index + 1] - current_dw)/d_interval
-        #         ddw.append(current_dd)
 
         # Find max second derivative as bankfull. turn this into a function... 
         ddw_abs = [abs(i) for i in ddw]
@@ -154,7 +199,7 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
         max_ddw = np.nanmax(ddw_abs[lower_bound_index:upper_bound_index])
         max_ddw_index = ddw_abs.index(max_ddw)
         bankfull_id_elevation = d_interval * max_ddw_index # sea-level elevation corresponding with bankfull
-        bankfull_results.append(bankfull_id_elevation)
+        topo_bankfull.append(bankfull_id_elevation)
         bankfull_width.append(xsection[max_ddw_index])
         # Output dw/ddw spacing, which is in 1/10 meter increments
         dw_xvals = get_x_vals(dw, d_interval)
@@ -173,20 +218,36 @@ def calc_derivatives(reach_name, d_interval, all_widths_df):
     fit_slope = slope*x
     fit_slope = [val[0] for val in fit_slope]
     # pairwise subtract fit from bankfull results
-    bankfull_results_detrend = []
-    for index, val in enumerate(bankfull_results):
-        bankfull_results_detrend.append(val - fit_slope[index])
+    topo_bankfull_detrend = []
+    for index, val in enumerate(topo_bankfull):
+        topo_bankfull_detrend.append(val - fit_slope[index])
 
-    print('black creek bankfull with is {} m'.format(np.nanmean(bankfull_width)))
     # save topo-derived bankfull for each transect
-    detrend_bankfull_results_dt = pd.DataFrame({'bankfull':bankfull_results_detrend})
-    detrend_bankfull_results_dt.to_csv('data/data_outputs/{}/transect_bankfull_topo_detrended.csv'.format(reach_name))
-    bankfull_results_dt = pd.DataFrame({'bankfull':bankfull_results})
-    bankfull_results_dt.to_csv('data/data_outputs/{}/transect_bankfull_topo.csv'.format(reach_name))
+    topo_bankfull_detrend_dt = pd.DataFrame({'bankfull':topo_bankfull_detrend})
+    topo_bankfull_detrend_dt.to_csv('data/data_outputs/{}/bankfull_topo_detrend.csv'.format(reach_name))
+    topo_bankfull_dt = pd.DataFrame({'bankfull':topo_bankfull})
+    topo_bankfull_dt.to_csv('data/data_outputs/{}/bankfull_topo.csv'.format(reach_name))
 
-    return(bankfull_results, bankfull_results_detrend)
+    return(topo_bankfull, topo_bankfull_detrend)
 
 def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df):
+    lower_ls = []
+    upper_ls = []
+    # Determine upper and lower bounds for bankfull ID
+    for x_index, xsection in enumerate(all_widths_df['widths']): # loop through all x-sections
+        for i, val in enumerate(xsection):
+            if val > 0: # ID first instance when width exceeds zero, set as thalweg start point
+                start_width_index = i
+                break
+        width_lower = xsection[start_width_index + 5] # width at 0.5m above thalweg
+        lower_ls.append(width_lower)
+        try:
+            width_upper = xsection[start_width_index + 100] # width at 10m above thalweg
+            upper_ls.append(width_upper)
+        except:
+            continue
+    lower = np.nanmedian(lower_ls)
+    upper = np.nanmedian(upper_ls)
     # average all xsection widths element-wise
     all_widths = all_widths_df['widths']
     max_len = max(len(ls) for ls in all_widths)
@@ -197,51 +258,51 @@ def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df):
         for elements in zip(*all_widths_padded)
     ]
     xs_xvals = get_x_vals(avg_width, d_interval)
-    dw = multipoint_slope(10, avg_width, xs_xvals)
-    ddw = multipoint_slope(10, dw, xs_xvals)
+    dw = multipoint_slope(5, avg_width, xs_xvals)
+    ddw = multipoint_slope(5, dw, xs_xvals)
+    lower_bound_index = find_boundary(avg_width, lower)
+    upper_bound_index = find_boundary(avg_width, upper)
     # apply rolling avg derivative calcs
     # ID bankfull (one across entire reach), save in csv
     ddw_abs = [abs(i) for i in ddw]
-    # Add in upper and lower search bounds on max 2nd deriv bankfull ID
-    for i, val in enumerate(avg_width):
-            if val > 0: # ID first instance when width exceeds zero, set as thalweg start point
-                start_width_index = i
-                break
-    lower_bound_index = start_width_index + 5 # lower bound set at 0.5m above thalweg
-    upper_bound_index = start_width_index + 100 # upper bound set at 10m above thalweg
     max_ddw = np.nanmax(ddw_abs[lower_bound_index:upper_bound_index])
     max_ddw_index = ddw_abs.index(max_ddw)
     ddw = ddw.tolist()
     max_neg_ddw = np.nanmin(ddw[lower_bound_index:upper_bound_index])
     max_neg_ddw_index = ddw.index(max_neg_ddw)
     bankfull_id_elevation = d_interval * max_ddw_index # sea-level elevation corresponding with bankfull
-    breakpoint()
     # figure this out with a plot...
     # avg_width = avg_width[:400] # chop off noisy end of data
     import matplotlib.pyplot as plt
     fig, axes = plt.subplots(3, 1, figsize=(15,15))
+    if reach_name == 'Leggett':
+        plot_x_lim = (2200,2300)
+    elif reach_name == 'Miranda':    
+        plot_x_lim = (600, 900)
     # plt.xlim((600,900)) (2200,2500) (50,400)
     axes[0].plot(avg_width)
     axes[0].axvline(max_ddw_index, label='2nd derivative abs maxima')
     axes[0].axvline(max_neg_ddw_index, label='2nd derivative minima', color='black')
     axes[0].set_title('Median channel widths')
-    axes[0].set_xlim((50,400))
+    axes[0].set_xlim(plot_x_lim)
+    if reach_name == 'Leggett':
+        axes[0].set_ylim((0, 100))
     axes[1].plot(dw)
     axes[1].axvline(max_ddw_index, label='2nd derivative abs maxima')
     axes[1].axvline(max_neg_ddw_index, label='2nd derivative minima', color='black')
-    axes[1].set_xlim((50,400))
+    axes[1].set_xlim(plot_x_lim)
     # axes[1].set_ylim((-200,100))
     axes[1].set_title('First derivative')
     axes[2].plot(ddw)
     axes[2].axvline(max_ddw_index, label='2nd derivative abs maxima')
     axes[2].axvline(max_neg_ddw_index, label='2nd derivative minima', color='black')
-    axes[2].set_xlim((50,400))
+    axes[2].set_xlim(plot_x_lim)
     # axes[2].set_ylim((-1000,1000))
     axes[2].set_title('Second derivative')
     plt.legend()
     
-    fig.suptitle('Brankfull slope identification for {} with 10pt rolling avg'.format(reach_name))
-    plt.savefig('data/data_outputs/{}_slopes_fig.jpeg'.format(reach_name))
+    fig.suptitle('Bankfull slope identification for {} with 10pt rolling avg'.format(reach_name))
+    plt.savefig('data/data_outputs/{}/aggregate_bankfull_slopes.jpeg'.format(reach_name))
 
     # there it is! 
     breakpoint()
