@@ -62,8 +62,8 @@ def plot_longitudinal_bf(reach_name):
     plt.close()
 
 def plot_bankfull_increments(reach_name, d_interval, plot_ylim):
-    bankfull_topo = pd.read_csv('data/data_outputs/{}/bankfull_topo.csv'.format(reach_name))
-    bankfull_benchmark = pd.read_csv('data/data_outputs/{}/bankfull_benchmark.csv'.format(reach_name))
+    bankfull_topo = pd.read_csv('data/data_outputs/{}/bankfull_topo_detrend.csv'.format(reach_name))
+    bankfull_benchmark = pd.read_csv('data/data_outputs/{}/bankfull_benchmark_detrend.csv'.format(reach_name))
     all_widths_df = pd.read_csv('data/data_outputs/{}/all_widths.csv'.format(reach_name))
     for index, row in all_widths_df.iterrows():
         all_widths_df.at[index, 'widths'] = eval(row['widths'])
@@ -199,6 +199,13 @@ def plot_bankfull_increments(reach_name, d_interval, plot_ylim):
     plt.axvline(topo_25, linestyle='dashed', color='grey')
     plt.axvline(topo_75, linestyle='dashed', color='grey', label='Topographic bankfull 25%-75%')
     plt.legend()
+    # Save 25/50/75 width lines to csv for later use
+    transect_25_df = pd.DataFrame(transect_25)
+    transect_50_df = pd.DataFrame(transect_50)
+    transect_75_df = pd.DataFrame(transect_75)
+    transect_25_df.to_csv('data/data_outputs/{}/transect_25.csv'.format(reach_name))
+    transect_50_df.to_csv('data/data_outputs/{}/transect_50.csv'.format(reach_name))
+    transect_75_df.to_csv('data/data_outputs/{}/transect_75.csv'.format(reach_name))
     plt.savefig('data/data_outputs/{}/median_widths.jpeg'.format(reach_name), dpi=400)
     # pdb.set_trace()
 

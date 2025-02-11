@@ -24,7 +24,7 @@ import pdb
 from analysis import id_benchmark_bankfull, calc_dwdh, calc_derivatives, calc_derivatives_aggregate, recurrence_interval
 from visualization import plot_bankfull_increments, plot_longitudinal_bf, multi_panel_plot
 
-reach_name = 'Scotia' # Choose 'Leggett' or 'Miranda' or 'Scotia'
+reach_name = 'Leggett' # Choose 'Leggett' or 'Miranda' or 'Scotia'
 
 # Steps for bankfull analysis:
 # 1. Identify benchmark bankfull using inundation rasters (Analysis.py -> id_benchmark_bankfull)
