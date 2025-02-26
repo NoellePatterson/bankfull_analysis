@@ -78,7 +78,7 @@ def plot_bankfull_increments(reach_name, d_interval, plot_ylim):
     if reach_name == 'Leggett':
         plt.xlim((220,270))
     elif reach_name == 'Miranda':
-        plt.xlim((60,100))
+        plt.xlim((60,80))
     elif reach_name == 'Scotia':
         plt.xlim(10,40)
 
@@ -133,23 +133,10 @@ def plot_bankfull_increments(reach_name, d_interval, plot_ylim):
     # plt.legend()
     # plt.savefig('data/data_outputs/Scotia/widths_by_reach_2.jpeg', dpi=400)
     # breakpoint()
-    
-    # Calculate cross section area based on discrete width increments
-    all_widths_df['areas'] = None
-    all_widths_df['areas'] = all_widths_df['areas'].astype('object')
-    for index, row in all_widths_df.iterrows():
-        widths = row['widths']
-        areas = []
-        cum_area = 0
-        for width in widths:
-            new_width = width * d_interval/100 # keep area in m^2
-            cum_area += new_width
-            areas.append(cum_area)
-        all_widths_df.at[index, 'areas'] = list(areas)
 
     # Plot average and bounds on all widths
     # calc element-wise avg, 25th, & 75th percentile of each width increment
-    bankfull_benchmark = bankfull_benchmark['benchmark_bankfull_ams']
+    bankfull_benchmark = bankfull_benchmark['benchmark_bankfull_ams_detrend']
     bankfull_topo = bankfull_topo['bankfull']
     benchmark_25 = np.nanpercentile(bankfull_benchmark, 25)
     benchmark_75 = np.nanpercentile(bankfull_benchmark, 75)
@@ -167,32 +154,19 @@ def plot_bankfull_increments(reach_name, d_interval, plot_ylim):
     transect_50 = padded_df.apply(lambda row: np.nanpercentile(row, 50), axis=0)
     transect_25 = padded_df.apply(lambda row: np.nanpercentile(row, 25), axis=0)
     transect_75 = padded_df.apply(lambda row: np.nanpercentile(row, 75), axis=0)
-    # prepare areas for plotting on secondary y axis
-    max_len = max(all_widths_df['areas'].apply(len)) # find the longest area row in df
-    all_widths_df['areas_padded'] = all_widths_df['areas'].apply(lambda x: np.pad(x, (0, max_len - len(x)), constant_values=np.nan)) # pad all shorter rows with nan
-    padded_df_areas = pd.DataFrame(all_widths_df['areas_padded'].tolist())
-    transect_50_area = padded_df_areas.apply(lambda row: np.nanpercentile(row, 50), axis=0)
-    transect_25_area = padded_df_areas.apply(lambda row: np.nanpercentile(row, 25), axis=0)
-    transect_75_area = padded_df_areas.apply(lambda row: np.nanpercentile(row, 75), axis=0)
+
     x_len = round(len(transect_50) * d_interval, 4)
     x_vals = np.arange(0, x_len, d_interval)
     if reach_name == 'Scotia':
         plt.xlim(plot_ylim) # truncate unneeded values from plot
     if reach_name == 'Miranda':
-        plt.xlim(60, 85)
+        plt.xlim(60, 80)
     if reach_name == 'Leggett':
         plt.xlim(plot_ylim)
     plt.plot(x_vals, transect_50, color='black', label='Width/height median')
     plt.plot(x_vals, transect_25, color='blue', label='Width/height 25-75%')
     plt.plot(x_vals, transect_75, color='blue')
     plt.legend(loc='center right')
-    # plot area on a secondary axis
-    # ax2 = ax.twinx()
-    # ax2.set_ylabel('Channel area ($m^2$)')
-    # ax2.set_ylim(0,30)
-    # ax2.plot(x_vals, transect_50_area, color='black')
-    # ax2.plot(x_vals, transect_25_area, color='green', label='channel area')
-    # ax2.plot(x_vals, transect_75_area, color='green')
 
     plt.axvline(benchmark_25, linestyle='dashed', color='black', label='Benchmark bankfull 25%-75%') 
     plt.axvline(benchmark_75, linestyle='dashed', color='black') 
@@ -335,4 +309,18 @@ def multi_panel_plot(reach_name, transects, dem, plot_interval, d_interval, bank
     # plt.close()
     # return 
 
-
+def output_record(reach_name, slope_window, d_interval, lower_bound, upper_bound):
+    topo_bankfull = pd.read_csv('data/data_outputs/{}/bankfull_topo.csv'.format(reach_name))
+    topo_bankfull_detrend = pd.read_csv('data/data_outputs/{}/bankfull_topo_detrend.csv'.format(reach_name))
+    benchmark_bankfull = pd.read_csv('data/data_outputs/{}/bankfull_benchmark.csv'.format(reach_name))
+    benchmark_bankfull_detrend = pd.read_csv('data/data_outputs/{}/bankfull_benchmark_detrend.csv'.format(reach_name))
+    topo_aggregate_bankfull = pd.read_csv('data/data_outputs/{}/bankfull_aggregate_elevation.csv'.format(reach_name))
+    topo_bf_median = np.nanmedian(topo_bankfull['bankfull'])
+    topo_bf_median_detrend = np.nanmedian(topo_bankfull_detrend['bankfull'])
+    benchmark_bf_median = np.nanmedian(benchmark_bankfull['benchmark_bankfull_ams'])
+    benchmark_bf_median_detrend = np.nanmedian(benchmark_bankfull_detrend['benchmark_bankfull_ams_detrend'])
+    topo_aggregate_df = topo_aggregate_bankfull['bankfull']
+    record_df = pd.DataFrame({'topo_bf_median': [topo_bf_median], 'topo_bf_median_detrend':[topo_bf_median_detrend], 'benchmark_bf_median': [benchmark_bf_median], \
+                              'benchmark_bf_median_detrend':[benchmark_bf_median_detrend],'topo_aggregate_df': [topo_aggregate_df[0]],\
+                              'slope_window': [slope_window], 'd_interval': [d_interval], 'lower_search_bound': [lower_bound], 'upper_search_bound': [upper_bound]})
+    record_df.to_csv('data/data_outputs/{}/Summary_results.csv'.format(reach_name))

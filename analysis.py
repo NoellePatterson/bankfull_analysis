@@ -5,6 +5,8 @@ from shapely.geometry import Point, shape, MultiPoint
 from shapely.geometry.point import Point
 from scipy.stats import linregress
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+from matplotlib.gridspec import GridSpec
 from sklearn.linear_model import LinearRegression
 import pdb
 
@@ -162,7 +164,7 @@ def calc_dwdh(reach_name, transects, dem, plot_interval, d_interval):
     all_widths_df.to_csv('data/data_outputs/{}/all_widths.csv'.format(reach_name))
     return(all_widths_df, bankfull_width)
 
-def calc_derivatives(reach_name, d_interval, all_widths_df, slope_window):
+def calc_derivatives(reach_name, d_interval, all_widths_df, slope_window, lower_bound, upper_bound):
     # calculate and plot second derivative of width (height is constant)
     # Calc upper and lower bounds widths
     lower_ls = []
@@ -172,10 +174,10 @@ def calc_derivatives(reach_name, d_interval, all_widths_df, slope_window):
             if val > 0: # ID first instance when width exceeds zero, set as thalweg start point
                 start_width_index = i
                 break
-        width_lower = xsection[start_width_index + 5] # width at 0.5m above thalweg
+        width_lower = xsection[start_width_index + lower_bound] # width at 0.5m above thalweg
         lower_ls.append(width_lower)
         try:
-            width_upper = xsection[start_width_index + 100] # width at 10m above thalweg
+            width_upper = xsection[start_width_index + upper_bound] # width at 10m above thalweg
             upper_ls.append(width_upper)
         except:
             continue
@@ -184,6 +186,8 @@ def calc_derivatives(reach_name, d_interval, all_widths_df, slope_window):
 
     topo_bankfull = []
     bankfull_width = []
+    test_bf_maxderiv = []
+    test_bf_minderiv = []
     for x_index, xsection in enumerate(all_widths_df['widths']): # loop through all x-sections
         dw = []
         ddw = []
@@ -192,12 +196,15 @@ def calc_derivatives(reach_name, d_interval, all_widths_df, slope_window):
         ddw = multipoint_slope(slope_window, dw, xs_xvals)
 
         # Find max second derivative as bankfull. 
-        ddw_abs = [abs(i) for i in ddw]
+        ddw_abs = [abs(i) for i in ddw] # This is how negative value is found. 
         # Add in upper and lower search bounds on max 2nd deriv bankfull ID
         lower_bound_index = find_boundary(xsection, lower)
         upper_bound_index = find_boundary(xsection, upper)
         max_ddw = np.nanmax(ddw_abs[lower_bound_index:upper_bound_index])
+        max_neg_ddw = np.nanmin(ddw[lower_bound_index:upper_bound_index])
         max_ddw_index = ddw_abs.index(max_ddw)
+        ddw = ddw.tolist()
+        max_neg_ddw_index = ddw.index(max_neg_ddw)
         bankfull_id_elevation = d_interval * max_ddw_index # sea-level elevation corresponding with bankfull
         topo_bankfull.append(bankfull_id_elevation)
         bankfull_width.append(xsection[max_ddw_index])
@@ -208,7 +215,48 @@ def calc_derivatives(reach_name, d_interval, all_widths_df, slope_window):
         ddw_df = pd.DataFrame({'elevation_m':ddw_xvals, 'ddw':ddw})
         dw_df.to_csv('data/data_outputs/{}/first_order_roc/first_order_roc_{}.csv'.format(reach_name, x_index))
         ddw_df.to_csv('data/data_outputs/{}/second_order_roc/second_order_roc_{}.csv'.format(reach_name, x_index))
-    
+        test_bf_maxderiv.append(d_interval * max_neg_ddw_index)
+        test_bf_minderiv.append(bankfull_id_elevation)
+
+        # Plot derivative results for each cross section plus cross-section
+        fig = plt.figure(figsize=(20,15))
+        gs = GridSpec(3, 3)
+        xs_plot = mpimg.imread("data/data_outputs/{}/transect_plots/bankfull_transect_{}.jpeg".format(reach_name, x_index))
+        if reach_name == 'Leggett':
+            plot_x_lim = (2200,2300)
+        elif reach_name == 'Miranda':    
+            plot_x_lim = (650, 740)
+        # plt.xlim((600,900)) (2200,2500) (50,400)
+        plt.subplot2grid((3,3), (0,2))
+        plt.plot(xsection)
+        plt.axvline(max_ddw_index, label='2nd derivative abs maxima', color='black')
+        # plt.axvline(max_neg_ddw_index, label='2nd derivative minima')
+        plt.title('Incremental channel widths')
+        plt.xlim(plot_x_lim)
+        if reach_name == 'Leggett':
+            plt.ylim((0, 100))
+        plt.subplot2grid((3,3), (1,2))    
+        plt.plot(dw)
+        plt.axvline(max_ddw_index, label='2nd derivative abs maxima', color='black')
+        # plt.axvline(max_neg_ddw_index, label='2nd derivative minima')
+        plt.xlim(plot_x_lim)
+        # plt.ylim((-200,100))
+        plt.title('First derivative')
+        plt.subplot2grid((3,3), (2,2))
+        plt.plot(ddw)
+        plt.axvline(max_ddw_index, label='2nd derivative abs maxima', color='black')
+        # plt.axvline(max_neg_ddw_index, label='2nd derivative minima')
+        plt.xlim(plot_x_lim)
+        # plt.ylim((-1000,1000))
+        plt.title('Second derivative')
+        plt.legend()
+        # Large plot spanning second column
+        plt.subplot2grid((3,3), (0,0), colspan=2, rowspan=3)
+        plt.imshow(xs_plot)
+        
+        fig.suptitle('Bankfull slope identification for {} with {}pt rolling avg'.format(reach_name, slope_window))
+        plt.savefig('data/data_outputs/{}/derivative_plots/{}.jpeg'.format(reach_name, x_index))
+    # breakpoint()
     # Use thalweg elevs to detrend bankfull elevation results. Don't remove intercept (keep at elevation) 
     x = np.array(all_widths_df['transect_id']).reshape((-1, 1))
     y = np.array(all_widths_df['thalweg_elev'])
@@ -230,7 +278,7 @@ def calc_derivatives(reach_name, d_interval, all_widths_df, slope_window):
 
     return(topo_bankfull, topo_bankfull_detrend)
 
-def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df, slope_window):
+def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df, slope_window, lower_bound, upper_bound):
     lower_ls = []
     upper_ls = []
     # Determine upper and lower bounds for bankfull ID
@@ -239,10 +287,10 @@ def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df, slope_wind
             if val > 0: # ID first instance when width exceeds zero, set as thalweg start point
                 start_width_index = i
                 break
-        width_lower = xsection[start_width_index + 5] # width at 0.5m above thalweg
+        width_lower = xsection[start_width_index + lower_bound] # width at 0.5m above thalweg
         lower_ls.append(width_lower)
         try:
-            width_upper = xsection[start_width_index + 100] # width at 10m above thalweg
+            width_upper = xsection[start_width_index + upper_bound] # width at 10m above thalweg
             upper_ls.append(width_upper)
         except:
             continue
@@ -251,7 +299,7 @@ def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df, slope_wind
     # average all xsection widths element-wise
     all_widths = all_widths_df['widths']
     max_len = max(len(ls) for ls in all_widths)
-    all_widths_padded = [ls + [None] * (max_len - len(ls)) for ls in all_widths]
+    all_widths_padded = [ls + [None] * (max_len - len(ls)) for ls in all_widths] # Pad with Nones to get all lists to same length
     # code to calculate element-wise average (from GPT)
     avg_width = [
         np.nanmedian([x for x in elements if x is not None])
@@ -271,41 +319,44 @@ def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df, slope_wind
     max_neg_ddw = np.nanmin(ddw[lower_bound_index:upper_bound_index])
     max_neg_ddw_index = ddw.index(max_neg_ddw)
     bankfull_id_elevation = d_interval * max_ddw_index # sea-level elevation corresponding with bankfull
-    # figure this out with a plot...
-    # avg_width = avg_width[:400] # chop off noisy end of data
-    import matplotlib.pyplot as plt
+
+    # Visualize steps above with a plot
     fig, axes = plt.subplots(3, 1, figsize=(15,15))
     if reach_name == 'Leggett':
         plot_x_lim = (2200,2300)
     elif reach_name == 'Miranda':    
-        plot_x_lim = (600, 900)
+        plot_x_lim = (650, 700)
     # plt.xlim((600,900)) (2200,2500) (50,400)
     axes[0].plot(avg_width)
-    axes[0].axvline(max_ddw_index, label='2nd derivative abs maxima')
-    axes[0].axvline(max_neg_ddw_index, label='2nd derivative minima', color='black')
-    axes[0].set_title('Median channel widths')
+    axes[0].axvline(max_ddw_index, label='2nd derivative abs maxima', color='black')
+    # axes[0].axvline(max_neg_ddw_index, label='2nd derivative minima')
+    axes[0].set_title('Incremental channel widths')
     axes[0].set_xlim(plot_x_lim)
     if reach_name == 'Leggett':
         axes[0].set_ylim((0, 100))
+    if reach_name == 'Miranda':
+        axes[0].set_ylim((-100, 100))
     axes[1].plot(dw)
-    axes[1].axvline(max_ddw_index, label='2nd derivative abs maxima')
-    axes[1].axvline(max_neg_ddw_index, label='2nd derivative minima', color='black')
+    axes[1].axvline(max_ddw_index, label='2nd derivative abs maxima', color='black')
+    # axes[1].axvline(max_neg_ddw_index, label='2nd derivative minima')
     axes[1].set_xlim(plot_x_lim)
     # axes[1].set_ylim((-200,100))
     axes[1].set_title('First derivative')
     axes[2].plot(ddw)
-    axes[2].axvline(max_ddw_index, label='2nd derivative abs maxima')
-    axes[2].axvline(max_neg_ddw_index, label='2nd derivative minima', color='black')
+    axes[2].axvline(max_ddw_index, label='2nd derivative abs maxima', color='black')
+    # axes[2].axvline(max_neg_ddw_index, label='2nd derivative minima')
     axes[2].set_xlim(plot_x_lim)
     # axes[2].set_ylim((-1000,1000))
     axes[2].set_title('Second derivative')
     plt.legend()
     
-    fig.suptitle('Bankfull slope identification for {} with 10pt rolling avg'.format(reach_name))
+    fig.suptitle('Bankfull slope identification for {} with {}pt rolling avg'.format(reach_name, slope_window))
     plt.savefig('data/data_outputs/{}/aggregate_bankfull_slopes.jpeg'.format(reach_name))
+    # output csv with the bankfull_id_elevation value in it
+    bankfull_aggregate_df = pd.DataFrame({'bankfull':[bankfull_id_elevation]})
+    bankfull_aggregate_df.to_csv('data/data_outputs/{}/bankfull_aggregate_elevation.csv'.format(reach_name))
 
     # there it is! 
-    breakpoint()
 
 def recurrence_interval():
     # Calculate recurrence interval of flow at bankfull stage along profile

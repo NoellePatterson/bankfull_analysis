@@ -22,9 +22,9 @@ from datetime import datetime
 import sys
 import pdb
 from analysis import id_benchmark_bankfull, calc_dwdh, calc_derivatives, calc_derivatives_aggregate, recurrence_interval
-from visualization import plot_bankfull_increments, plot_longitudinal_bf, multi_panel_plot
+from visualization import plot_bankfull_increments, plot_longitudinal_bf, multi_panel_plot, output_record
 
-reach_name = 'Leggett' # Choose 'Leggett' or 'Miranda' or 'Scotia'
+reach_name = 'Miranda' # Choose 'Leggett' or 'Miranda' or 'Scotia'
 
 # Steps for bankfull analysis:
 # 1. Identify benchmark bankfull using inundation rasters (Analysis.py -> id_benchmark_bankfull)
@@ -72,7 +72,7 @@ if not os.path.exists('data/data_outputs/{}/second_order_roc'.format(reach_name)
 if not os.path.exists('data/data_outputs/{}/all_widths'.format(reach_name)):
     os.makedirs('data/data_outputs/{}/all_widths'.format(reach_name))
 
-# Upload test data: transects, stations, and bankfull raster 
+# Read in test data: transects, stations, and bankfull raster 
 transects = gpd.read_file(transect_fp)
 bankfull = rasterio.open(bankfull_fp)
 dem = rasterio.open(dem_fp)
@@ -83,21 +83,26 @@ bankfull_footprint = shape(bankfull_footprint)
 bankfull_boundary = bankfull_footprint.boundary
 bankfull_boundary = gpd.GeoDataFrame({'geometry':[bankfull_boundary]}, crs=bankfull.crs)
 
+# Set algorithm parameters
 plot_interval = 1 # set plotting interval along transect in units of meters
 d_interval = 10/100 # Set intervals to step up in depth (in units meters). 10cm intervals
-slope_window = 5 # Set window size for calculating slope for derivatives
+slope_window = 10 # Set window size for calculating slope for derivatives
+lower_bound = 5 # Set lower vertical boundary for bankfull id within cross-section, in units of d_interval. 5 = 50cm
+upper_bound = 100 # Set upper vertical boundary for bankfull id within cross-section, in units of d_interval. 100 = 10m
 
 # Uncomment functions to run
 
-output = id_benchmark_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval)
-all_widths_df, bankfull_width = calc_dwdh(reach_name, transects, dem, plot_interval, d_interval)
-print('Dwdh calc done!!')
-topo_bankfull, topo_bankfull_detrend = calc_derivatives(reach_name, d_interval, all_widths_df, slope_window)
-print('Derivatives calc done!!')
-output = calc_derivatives_aggregate(reach_name, d_interval, all_widths_df, slope_window)
+# output = id_benchmark_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval)
+# all_widths_df, bankfull_width = calc_dwdh(reach_name, transects, dem, plot_interval, d_interval)
+# print('Dwdh calc done!!')
+# topo_bankfull, topo_bankfull_detrend = calc_derivatives(reach_name, d_interval, all_widths_df, slope_window, lower_bound, upper_bound)
+# print('Derivatives calc done!!')
+# output = calc_derivatives_aggregate(reach_name, d_interval, all_widths_df, slope_window, lower_bound, upper_bound)
+# output = output_record(reach_name, slope_window, d_interval, lower_bound, upper_bound)
 # output = recurrence_interval(flow_record, bankfull_results)
 
 # Plotting functions
-# output = plot_longitudinal_bf(reach_name)
+output = plot_longitudinal_bf(reach_name)
 output = plot_bankfull_increments(reach_name, d_interval, plot_ylim)
-# output = multi_panel_plot(reach_name, transects, dem, plot_interval, d_interval, bankfull_boundary)
+output = multi_panel_plot(reach_name, transects, dem, plot_interval, d_interval, bankfull_boundary)
+output = output_record(reach_name, slope_window, d_interval, lower_bound, upper_bound)
