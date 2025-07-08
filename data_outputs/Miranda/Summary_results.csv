@@ -1,0 +1,2 @@
+,topo_bf_median,topo_bf_median_detrend,benchmark_bf_median,benchmark_bf_median_detrend,topo_aggregate_df,slope_window,d_interval,lower_search_bound,upper_search_bound
+0,68.2,69.03093955496762,71.4362,72.92150788932452,66.3,10,0.1,5,100
