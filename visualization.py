@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from numpy import nan
-import pdb
+import glob
 import geopandas as gpd
 from shapely.geometry import Point, shape, MultiPoint
 from shapely.geometry.point import Point
@@ -529,12 +529,64 @@ def multi_panel_plot(reach_name, transects, dem, plot_interval, d_interval, bank
     # plt.close()
     # return 
 
+def plot_inflections(all_widths_df, d_interval, reach_name):
+    # bring in 2nd derivative files
+    inflections_fp = glob.glob('data_outputs/{}/second_order_roc/*'.format(reach_name))
+    # bring in aggregated inflections array for plotting
+    inflections_array_agg = pd.read_csv('data_outputs/{}/inflections_array_agg.csv'.format(reach_name))
+    # Use thalweg elevs to detrend 2nd derivatives. Don't remove intercept (keep at elevation) 
+    x = np.cumsum(all_widths_df['thalweg_distance'].values).reshape((-1,1))
+    y = np.array(all_widths_df['thalweg_elev'])
+    model = LinearRegression().fit(x, y)
+    slope = model.coef_
+    intercept = model.intercept_
+    fit_slope = slope*x
+    fit_slope = [val[0] for val in fit_slope]
+
+    # Set up plot and create color ramp 
+    cmap = plt.cm.viridis
+    norm = Normalize(vmin=0, vmax=len(inflections_fp)-1)
+    fig, ax = plt.subplots(figsize=(12, 9))
+    plt.ylabel('Inflection magnitude')
+    plt.xlabel('Detrended elevation (m)')
+    plt.title('Cross section width inflections for {}'.format(reach_name))
+    if reach_name == 'Leggett':
+        plt.xlim((-5,30))
+    if reach_name == 'Miranda':
+        plt.xlim((60,80))
+    elif reach_name == 'Scotia':
+        plt.xlim((75,400))
+    # loop through files and plot
+    for index, inflection_fp in enumerate(inflections_fp): 
+        inflection = pd.read_csv(inflection_fp)
+        # detrend inflections so they all plot at the same starting point
+        offset = fit_slope[index]
+        offset = offset / d_interval
+        offset_int = int(offset)
+        if index >20:
+            continue
+            # first inflection plots all wonky, skip it
+        if offset_int < 0:
+            inflection = [0] * abs(offset_int) + inflection['ddw'].tolist()
+        else: # Only other case is no detrend (first transect)
+            inflection = inflection
+        # plot all inflections spaghetti style
+        plt.plot(inflection, alpha=0.5, color=cmap(norm(index)), linewidth=0.75) 
+    sm = ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])  # Set array to avoid warnings
+    cbar = plt.colorbar(sm, ax=ax)
+    cbar.set_label("Downstream distance (m)")
+    # overlay aggregate inflections
+    plt.plot(inflections_array_agg, color='black', linewidth=0.75)
+    plt.savefig('data_outputs/{}/inflections_all.jpeg'.format(reach_name))
+    return
+
 def output_record(reach_name, slope_window, d_interval, lower_bound, upper_bound):
-    topo_bankfull = pd.read_csv('data/data_outputs/{}/bankfull_topo.csv'.format(reach_name))
-    topo_bankfull_detrend = pd.read_csv('data/data_outputs/{}/bankfull_topo_detrend.csv'.format(reach_name))
-    benchmark_bankfull = pd.read_csv('data/data_outputs/{}/bankfull_benchmark.csv'.format(reach_name))
-    benchmark_bankfull_detrend = pd.read_csv('data/data_outputs/{}/bankfull_benchmark_detrend.csv'.format(reach_name))
-    topo_aggregate_bankfull = pd.read_csv('data/data_outputs/{}/bankfull_aggregate_elevation.csv'.format(reach_name))
+    topo_bankfull = pd.read_csv('data_outputs/{}/bankfull_topo.csv'.format(reach_name))
+    topo_bankfull_detrend = pd.read_csv('data_outputs/{}/bankfull_topo_detrend.csv'.format(reach_name))
+    benchmark_bankfull = pd.read_csv('data_outputs/{}/bankfull_benchmark.csv'.format(reach_name))
+    benchmark_bankfull_detrend = pd.read_csv('data_outputs/{}/bankfull_benchmark_detrend.csv'.format(reach_name))
+    topo_aggregate_bankfull = pd.read_csv('data_outputs/{}/bankfull_aggregate_elevation.csv'.format(reach_name))
     topo_bf_median = np.nanmedian(topo_bankfull['bankfull'])
     topo_bf_median_detrend = np.nanmedian(topo_bankfull_detrend['bankfull'])
     benchmark_bf_median = np.nanmedian(benchmark_bankfull['benchmark_bankfull_ams'])
@@ -543,4 +595,4 @@ def output_record(reach_name, slope_window, d_interval, lower_bound, upper_bound
     record_df = pd.DataFrame({'topo_bf_median': [topo_bf_median], 'topo_bf_median_detrend':[topo_bf_median_detrend], 'benchmark_bf_median': [benchmark_bf_median], \
                               'benchmark_bf_median_detrend':[benchmark_bf_median_detrend],'topo_aggregate_df': [topo_aggregate_df[0]],\
                               'slope_window': [slope_window], 'd_interval': [d_interval], 'lower_search_bound': [lower_bound], 'upper_search_bound': [upper_bound]})
-    record_df.to_csv('data/data_outputs/{}/Summary_results.csv'.format(reach_name))
+    record_df.to_csv('data_outputs/{}/Summary_results.csv'.format(reach_name))

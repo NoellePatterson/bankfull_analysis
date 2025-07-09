@@ -22,7 +22,7 @@ from datetime import datetime
 import sys
 import pdb
 from analysis import id_benchmark_bankfull, calc_dwdh, calc_derivatives, calc_derivatives_aggregate
-from visualization import plot_bankfull_increments, plot_longitudinal_bf, multi_panel_plot, output_record, plot_wd_and_xsections, stacked_width_plots, transect_plot
+from visualization import plot_bankfull_increments, plot_longitudinal_bf, multi_panel_plot, stacked_width_plots, transect_plot, plot_inflections
 from spatial_analysis import create_bankfull_pts
 
 reach_name = 'Scotia' # Choose 'Leggett' or 'Miranda' or 'Scotia'
@@ -101,7 +101,7 @@ spatial_plot_interval = 0.5 # interval for finding bankfull elevation along tran
 # output = id_benchmark_bankfull(reach_name, transects, dem, d_interval, bankfull_boundary, plot_interval)
 all_widths_df, bankfull_width = calc_dwdh(reach_name, transects, dem, plot_interval, d_interval)
 print('Dwdh calc done!!')
-topo_bankfull, topo_bankfull_detrend = calc_derivatives(reach_name, d_interval, all_widths_df, slope_window, lower_bound, upper_bound)
+# topo_bankfull, topo_bankfull_detrend = calc_derivatives(reach_name, d_interval, all_widths_df, slope_window, lower_bound, upper_bound)
 # print('Derivatives calc done!!')
 # output = calc_derivatives_aggregate(reach_name, d_interval, all_widths_df, slope_window)
 # output = output_record(reach_name, slope_window, d_interval, lower_bound, upper_bound)
@@ -114,6 +114,7 @@ topo_bankfull, topo_bankfull_detrend = calc_derivatives(reach_name, d_interval, 
 # output = stacked_width_plots(d_interval)
 # output = multi_panel_plot(reach_name, transects, dem, plot_interval, d_interval, bankfull_boundary)
 # output = output_record(reach_name, slope_window, d_interval, lower_bound, upper_bound)
+plot_inflections(all_widths_df, d_interval, reach_name)
 
 # Spatial analysis
 # output = create_bankfull_pts(transects, dem, thalweg, d_interval, spatial_plot_interval, reach_name)

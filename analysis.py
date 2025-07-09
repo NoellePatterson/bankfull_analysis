@@ -438,6 +438,7 @@ def calc_derivatives_aggregate(reach_name, d_interval, all_widths_df, slope_wind
     max_len_agg = max(len(peaks_pos_agg[0]), len(peaks_neg_agg[0]))
     pos_peak_indices_pad_agg = max_pos_peak_agg + [np.nan] * (max_len_agg - len(max_pos_peak_agg))
     neg_peak_indices_pad_agg = max_neg_peak_agg + [np.nan] * (max_len_agg - len(max_neg_peak_agg))
+    pd.DataFrame(inflections_array_agg).to_csv('data_outputs/{}/inflections_array_agg.csv'.format(reach_name), index=False)
     max_inflections_df_agg = pd.DataFrame({'pos_inflections':pos_peak_indices_pad_agg, 'neg_inflections':neg_peak_indices_pad_agg})
     max_inflections_df_agg.to_csv('data_outputs/{}/max_inflections_aggregate.csv'.format(reach_name))
 
